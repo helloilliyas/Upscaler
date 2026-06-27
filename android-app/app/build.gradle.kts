@@ -46,9 +46,22 @@ android {
         )
     }
 
+    signingConfigs {
+        // Committed debug keystore so every build (CI included) has a stable
+        // SHA-1 to register for Google sign-in. Debug keystores are not secret
+        // (the password is the well-known "android").
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
+            signingConfig = signingConfigs.getByName("debug")
         }
         release {
             isMinifyEnabled = true

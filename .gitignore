@@ -35,6 +35,9 @@ android-app/captures/
 *.aab
 *.keystore
 *.jks
+# Exception: the shared debug keystore is intentionally committed (non-secret)
+# so CI debug builds have a stable signing SHA-1 for Google sign-in.
+!android-app/app/debug.keystore
 
 # Secrets
 .env
