@@ -106,6 +106,7 @@ dependencies {
 
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.exifinterface)
 
     implementation(libs.retrofit)
     implementation(libs.retrofit.serialization)

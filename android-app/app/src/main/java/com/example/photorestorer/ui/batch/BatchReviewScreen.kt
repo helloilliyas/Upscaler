@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
@@ -20,6 +20,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -38,6 +39,7 @@ import com.example.photorestorer.data.model.RestorationMode
 @Composable
 fun BatchReviewScreen(
     onBack: () -> Unit,
+    onEditMask: (Int) -> Unit,
     onStarted: () -> Unit,
     viewModel: BatchViewModel = hiltViewModel(),
 ) {
@@ -100,7 +102,7 @@ fun BatchReviewScreen(
                 modifier = Modifier.fillMaxWidth().weight(1f),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                items(state.photos, key = { it.toString() }) { uri ->
+                itemsIndexed(state.photos, key = { _, uri -> uri.toString() }) { index, uri ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         AsyncImage(
                             model = uri,
@@ -114,7 +116,13 @@ fun BatchReviewScreen(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
-                        Button(onClick = { viewModel.removePhoto(uri) }) { Text("Remove") }
+                        if (state.mode == RestorationMode.RESTORE) {
+                            val masked = state.maskedPhotos.contains(uri.toString())
+                            TextButton(onClick = { onEditMask(index) }) {
+                                Text(if (masked) "Mask ✓" else "Mask")
+                            }
+                        }
+                        TextButton(onClick = { viewModel.removePhoto(uri) }) { Text("Remove") }
                     }
                 }
             }

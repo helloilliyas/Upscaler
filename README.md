@@ -31,14 +31,15 @@ product scope, architecture, API contract, and implementation phases.
 - ✅ Kotlin + Jetpack Compose + Hilt + MVVM, wired to the backend API
 - ✅ Sign in with Google via Credential Manager (ID token only; no Modal secrets in the APK)
 - ✅ Photo Picker selection (up to 50), batch review with mode/output selection
+- ✅ Repair-brush mask editor (Restore mode): paint/erase, brush size, undo/clear, EXIF-aligned grayscale mask PNG uploaded with the photo
 - ✅ Retrofit/OkHttp client matching the `/v1` contract; streaming uploads/downloads
 - ✅ Persistent WorkManager chain (Submit → Poll → Download → Cleanup) with idempotency keys
 - ✅ Room history, DataStore settings, MediaStore Gallery save, before/after result view
 - ✅ CI builds the debug APK (`.github/workflows/android-ci.yml`); JVM unit tests for model mapping
 
-Not yet implemented (later phases): CodeFormer (faces) and LaMa (repair mask)
-stages, the SUPIR Ultra worker, the in-editor crop/rotate and repair-brush mask,
-and the signed-release workflow.
+Not yet implemented (later phases): CodeFormer (faces) and LaMa (repair-mask
+inpainting) backend stages, the SUPIR Ultra worker, in-editor crop/rotate, and
+the signed-release workflow.
 
 > The Android module builds via GitHub Actions (which provides the Android SDK).
 > Configure it with a `BASE_URL` (your Modal endpoint) and `GOOGLE_WEB_CLIENT_ID`
