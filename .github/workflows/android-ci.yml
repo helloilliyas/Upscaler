@@ -19,6 +19,13 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    # Non-secret build config. Set these as repository Variables
+    # (Settings → Secrets and variables → Actions → Variables). When unset they
+    # fall back to placeholders in app/build.gradle.kts and the build still works.
+    env:
+      BASE_URL: ${{ vars.BASE_URL }}
+      GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID }}
+
     defaults:
       run:
         working-directory: android-app
