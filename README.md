@@ -14,7 +14,7 @@ product scope, architecture, API contract, and implementation phases.
 
 ## Status
 
-This repository currently contains the **backend foundation**:
+**Backend foundation** (`backend/`):
 
 - ✅ FastAPI app with the full `/v1` API contract (health, me, jobs CRUD, result/preview)
 - ✅ Google ID-token verification + approved-account policy
@@ -25,18 +25,37 @@ This repository currently contains the **backend foundation**:
 - ✅ Modal deployment glue (`backend/modal_app.py`) with standard + ultra GPU workers
 - ✅ CI: ruff + mypy + pytest (`.github/workflows/backend-test.yml`) and Modal deploy
 
-Not yet implemented (later phases): the real model pipelines, the Android app,
-and the signed-release workflow.
+**Android app scaffold** (`android-app/`):
+
+- ✅ Kotlin + Jetpack Compose + Hilt + MVVM, wired to the backend API
+- ✅ Sign in with Google via Credential Manager (ID token only; no Modal secrets in the APK)
+- ✅ Photo Picker selection (up to 50), batch review with mode/output selection
+- ✅ Retrofit/OkHttp client matching the `/v1` contract; streaming uploads/downloads
+- ✅ Persistent WorkManager chain (Submit → Poll → Download → Cleanup) with idempotency keys
+- ✅ Room history, DataStore settings, MediaStore Gallery save, before/after result view
+- ✅ CI builds the debug APK (`.github/workflows/android-ci.yml`); JVM unit tests for model mapping
+
+Not yet implemented (later phases): the real model pipelines (Real-ESRGAN/
+CodeFormer/LaMa/SUPIR), the in-editor crop/rotate and repair-brush mask, and the
+signed-release workflow.
+
+> The Android module builds via GitHub Actions (which provides the Android SDK).
+> Configure it with a `BASE_URL` (your Modal endpoint) and `GOOGLE_WEB_CLIENT_ID`
+> via Gradle properties or environment variables at build time.
 
 ## Repository layout
 
 ```text
-backend/            FastAPI + Modal backend (this foundation)
+backend/            FastAPI + Modal backend
   app/              framework-agnostic application code
   tests/            pytest unit + API tests (no GPU required)
   modal_app.py      Modal deployment entrypoint (Volume/Dict + GPU workers)
+android-app/        Kotlin + Compose app (Gradle, builds in CI)
+  app/src/main/     auth, network, database, repository, worker, ui, di
+  app/src/test/     JVM unit tests
 docs/               architecture, API, privacy, licences, test plan
-.github/workflows/  backend tests + Modal deploy
+scripts/            model download + hash verification
+.github/workflows/  android-ci, backend-test, modal-deploy
 .devcontainer/      Codespaces dev environment
 ```
 
