@@ -1,0 +1,31 @@
+[project]
+name = "ai-photo-restorer-backend"
+version = "1.0.0"
+description = "FastAPI + Modal backend for the AI Photo Restorer app"
+requires-python = ">=3.11"
+readme = "../README.md"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["app", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP", "B"]
+# modal_app.py is GPU/Modal glue not exercised by CI; keep lint focused on app/.
+ignore = [
+    "B008",   # FastAPI uses callables in argument defaults (Form/Header/Depends)
+    "UP042",  # `str`+`Enum` is intentional for JSON-friendly, comparable enums
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+warn_unused_ignores = false
+check_untyped_defs = true
+# modal_app.py imports the optional `modal` package; skip it in CI type checks.
+exclude = ["modal_app.py"]

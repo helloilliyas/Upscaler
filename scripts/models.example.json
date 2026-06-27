@@ -1,0 +1,17 @@
+{
+  "_comment": "Example model manifest. Copy to scripts/models.json and fill in real URLs/hashes. Weights are never committed to the repo.",
+  "models": [
+    {
+      "name": "realesr-general-x4v3",
+      "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth",
+      "sha256": "REPLACE_WITH_REAL_SHA256",
+      "license": "BSD-3-Clause (verify weights)"
+    },
+    {
+      "name": "RealESRGAN_x4plus",
+      "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth",
+      "sha256": "REPLACE_WITH_REAL_SHA256",
+      "license": "BSD-3-Clause (verify weights)"
+    }
+  ]
+}
