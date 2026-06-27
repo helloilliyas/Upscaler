@@ -11,8 +11,13 @@ Model inference is mocked by the placeholder processor; no GPU is required.
 | Upload validation | `tests/test_image_validation.py` | format/size/pixel limits, garbage bytes, mask alignment + PNG requirement |
 | Output sizing | `tests/test_sizing.py` | 2×/4×/4K/8K rules, aspect preservation, orientation-aware boxes |
 | Job service | `tests/test_jobs.py` | idempotency, ownership, transitions, deletion + file cleanup, expired result |
+| Processing | `tests/test_processor.py` | shared `run_image_job` orchestration (stub enhance), placeholder resize, lazy-import contract of the Real-ESRGAN module |
 | API (e2e) | `tests/test_api.py` | health/me, submit→complete→download, ownership 403/404, delete, error mapping |
 | Idempotency | `tests/test_idempotency.py` | repeated key returns same job at the HTTP layer |
+
+The Real-ESRGAN **model inference itself** runs only on a GPU and is verified by
+deploying to Modal — see [`DEPLOY.md`](DEPLOY.md). The unit tests cover the
+orchestration around it with a stub enhance function (no torch/GPU required).
 
 ## Later phases (not yet implemented)
 

@@ -21,8 +21,9 @@ product scope, architecture, API contract, and implementation phases.
 - ✅ Upload validation (format, size, pixel limits, EXIF/GPS handling, mask alignment)
 - ✅ Storage abstractions (Modal Volume / Dict) with local in-memory + filesystem implementations
 - ✅ Async job lifecycle, idempotency, ownership enforcement, retention-ready deletion
-- ✅ A GPU-free **placeholder processor** (deterministic resize) so the whole flow runs and is tested without a GPU
-- ✅ Modal deployment glue (`backend/modal_app.py`) with standard + ultra GPU workers
+- ✅ **Real-ESRGAN** standard pipeline (Natural + Restore upscaling) with tiling, behind a shared `run_image_job` orchestration; weights pinned by SHA-256 and baked into the Modal image at build (see [`docs/DEPLOY.md`](docs/DEPLOY.md))
+- ✅ A GPU-free **placeholder processor** (deterministic resize) still used by the Ultra worker and for CPU tests
+- ✅ Modal deployment glue (`backend/modal_app.py`) with standard (Real-ESRGAN) + ultra (placeholder) GPU workers
 - ✅ CI: ruff + mypy + pytest (`.github/workflows/backend-test.yml`) and Modal deploy
 
 **Android app scaffold** (`android-app/`):
@@ -35,9 +36,9 @@ product scope, architecture, API contract, and implementation phases.
 - ✅ Room history, DataStore settings, MediaStore Gallery save, before/after result view
 - ✅ CI builds the debug APK (`.github/workflows/android-ci.yml`); JVM unit tests for model mapping
 
-Not yet implemented (later phases): the real model pipelines (Real-ESRGAN/
-CodeFormer/LaMa/SUPIR), the in-editor crop/rotate and repair-brush mask, and the
-signed-release workflow.
+Not yet implemented (later phases): CodeFormer (faces) and LaMa (repair mask)
+stages, the SUPIR Ultra worker, the in-editor crop/rotate and repair-brush mask,
+and the signed-release workflow.
 
 > The Android module builds via GitHub Actions (which provides the Android SDK).
 > Configure it with a `BASE_URL` (your Modal endpoint) and `GOOGLE_WEB_CLIENT_ID`

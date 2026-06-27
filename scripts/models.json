@@ -1,0 +1,25 @@
+{
+  "_comment": "Real model manifest with pinned SHA-256 hashes. Weights are downloaded at Modal image build time and verified before use; they are never committed to the repo.",
+  "models": [
+    {
+      "name": "realesr-general-x4v3",
+      "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth",
+      "sha256": "8dc7edb9ac80ccdc30c3a5dca6616509367f05fbc184ad95b731f05bece96292",
+      "bytes": 4885111,
+      "arch": "SRVGGNetCompact",
+      "scale": 4,
+      "license": "BSD-3-Clause (Real-ESRGAN); personal use OK",
+      "reviewed": "2026-06-27"
+    },
+    {
+      "name": "RealESRGAN_x4plus",
+      "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth",
+      "sha256": "4fa0d38905f75ac06eb49a7951b426670021be3018265fd191d2125df9d682f1",
+      "bytes": 67040989,
+      "arch": "RRDBNet",
+      "scale": 4,
+      "license": "BSD-3-Clause (Real-ESRGAN); personal use OK",
+      "reviewed": "2026-06-27"
+    }
+  ]
+}

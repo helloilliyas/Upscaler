@@ -13,7 +13,7 @@ status, and the date reviewed.
 
 | Component | Use | Licence consideration | Reviewed |
 |---|---|---|---|
-| Real-ESRGAN | Standard restoration / upscaling | BSD-3-Clause repo; verify weights + deps | _pending_ |
+| Real-ESRGAN | Standard restoration / upscaling | BSD-3-Clause repo; weights personal-use OK | 2026-06-27 |
 | CodeFormer | Face restoration | **Non-commercial** S-Lab terms | _pending_ |
 | LaMa | Inpainting / scratch repair | Apache-2.0 repo; verify weights + deps | _pending_ |
 | SUPIR | Ultra Detail generative restoration | **Explicit non-commercial restrictions** | _pending_ |
@@ -25,6 +25,17 @@ status, and the date reviewed.
 ## Weight verification
 
 Model weights are **not** committed to this repository. They are downloaded at
-image-build time (or from a dedicated Modal Volume) and checked against pinned
-SHA-256 hashes by `scripts/verify_model_hashes.py` before use. Never download
-weights from an unverified mirror.
+Modal image-build time and checked against pinned SHA-256 hashes before use.
+Never download weights from an unverified mirror.
+
+Pinned hashes live in two kept-in-sync places:
+
+* `scripts/models.json` — used by `scripts/download_models.py` /
+  `scripts/verify_model_hashes.py` for local/manual workflows.
+* `STANDARD_WEIGHTS` in `backend/modal_app.py` — baked into the standard worker
+  image at build time via `download_standard_weights()`.
+
+| Weight | SHA-256 (prefix) | Bytes |
+|---|---|---|
+| `realesr-general-x4v3.pth` | `8dc7edb9…96292` | 4,885,111 |
+| `RealESRGAN_x4plus.pth` | `4fa0d389…682f1` | 67,040,989 |

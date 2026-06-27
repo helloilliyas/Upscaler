@@ -26,11 +26,53 @@ from app.storage import FileStore, MetadataStore
 from app.workers.processor import LocalPlaceholderProcessor
 
 DATA_MOUNT = "/data"
+# Weights are baked into the standard image at build time (see below).
+MODELS_DIR = "/models"
+
+# Real-ESRGAN checkpoints with pinned SHA-256 hashes (kept in sync with
+# scripts/models.json). Verified before use; never committed to the repo.
+STANDARD_WEIGHTS = [
+    {
+        "name": "realesr-general-x4v3",
+        "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth",
+        "sha256": "8dc7edb9ac80ccdc30c3a5dca6616509367f05fbc184ad95b731f05bece96292",
+    },
+    {
+        "name": "RealESRGAN_x4plus",
+        "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth",
+        "sha256": "4fa0d38905f75ac06eb49a7951b426670021be3018265fd191d2125df9d682f1",
+    },
+]
 
 app = modal.App("ai-photo-restorer")
 
 files_volume = modal.Volume.from_name("photo-restorer-files", create_if_missing=True)
 jobs_dict = modal.Dict.from_name("photo-restorer-jobs", create_if_missing=True)
+
+
+def download_standard_weights() -> None:
+    """Build-time step: fetch + verify Real-ESRGAN weights into MODELS_DIR.
+
+    Filesystem writes during ``run_function`` persist into the image layer, so
+    the weights ship inside the image and cold starts don't re-download them.
+    """
+    import hashlib
+    import os
+    import urllib.request
+
+    os.makedirs(MODELS_DIR, exist_ok=True)
+    for model in STANDARD_WEIGHTS:
+        dest = os.path.join(MODELS_DIR, f"{model['name']}.pth")
+        with urllib.request.urlopen(model["url"]) as resp, open(dest, "wb") as out:
+            while chunk := resp.read(1 << 20):
+                out.write(chunk)
+        digest = hashlib.sha256()
+        with open(dest, "rb") as fh:
+            for chunk in iter(lambda: fh.read(1 << 20), b""):
+                digest.update(chunk)
+        if digest.hexdigest() != model["sha256"]:
+            raise RuntimeError(f"SHA-256 mismatch for {model['name']}")
+
 
 # Lightweight image for the web layer (no torch / CUDA).
 web_image = (
@@ -46,8 +88,28 @@ web_image = (
     .add_local_python_source("app")
 )
 
-# Standard GPU worker image (model libraries added as pipelines are implemented).
-standard_image = web_image  # TODO: extend with Real-ESRGAN / CodeFormer / LaMa deps.
+# Standard GPU worker image: Real-ESRGAN stack + weights baked at build time.
+# torch 2.1.2 / torchvision 0.16.2 are pinned because basicsr imports
+# torchvision.transforms.functional_tensor, which was removed in torchvision
+# 0.17. numpy<2 keeps basicsr/torch happy.
+standard_image = (
+    modal.Image.debian_slim(python_version="3.11")
+    .apt_install("libgl1", "libglib2.0-0")
+    .pip_install(
+        "torch==2.1.2",
+        "torchvision==0.16.2",
+        "numpy<2",
+        "opencv-python-headless==4.9.0.80",
+        "realesrgan==0.3.0",
+        "basicsr==1.4.2",
+        "Pillow>=10.3",
+        "pydantic>=2.7",
+        "pydantic-settings>=2.3",
+        "google-auth>=2.30",
+    )
+    .run_function(download_standard_weights)
+    .add_local_python_source("app")
+)
 
 
 # --- Modal-backed storage implementations --------------------------------
@@ -109,25 +171,42 @@ class ModalDictMetadataStore(MetadataStore):
 # --- GPU workers ---------------------------------------------------------
 
 
-@app.cls(gpu="L4", timeout=20 * 60, volumes={DATA_MOUNT: files_volume})
+@app.cls(
+    gpu="L4",
+    timeout=20 * 60,
+    image=standard_image,
+    volumes={DATA_MOUNT: files_volume},
+)
 class StandardRestorer:
     @modal.enter()
     def load_models(self) -> None:
-        # TODO: load Real-ESRGAN / CodeFormer / LaMa once per container.
+        from app.workers.standard_processor import StandardModelProcessor
+
         self._files = ModalVolumeFileStore(DATA_MOUNT, files_volume)
         self._jobs = JobService(ModalDictMetadataStore(jobs_dict), self._files)
-        self._processor = LocalPlaceholderProcessor(self._jobs, self._files)
+        # Real-ESRGAN upscaling (Natural / Restore). CodeFormer + LaMa land in a
+        # later phase. half=True is safe on the L4 GPU.
+        self._processor = StandardModelProcessor(
+            self._jobs, self._files, weights_dir=MODELS_DIR, tile=512, half=True
+        )
+        self._processor.warmup()
 
     @modal.method()
     def process(self, job_id: str) -> None:
         self._processor.process(job_id)
 
 
-@app.cls(gpu="L40S", timeout=30 * 60, volumes={DATA_MOUNT: files_volume})
+@app.cls(
+    gpu="L40S",
+    timeout=30 * 60,
+    image=web_image,
+    volumes={DATA_MOUNT: files_volume},
+)
 class UltraRestorer:
     @modal.enter()
     def load_models(self) -> None:
-        # TODO: load SUPIR + supporting diffusion components once per container.
+        # TODO: Phase 6 — load SUPIR + supporting diffusion components. For now
+        # the Ultra worker runs the placeholder resize on the lightweight image.
         self._files = ModalVolumeFileStore(DATA_MOUNT, files_volume)
         self._jobs = JobService(ModalDictMetadataStore(jobs_dict), self._files)
         self._processor = LocalPlaceholderProcessor(self._jobs, self._files)
