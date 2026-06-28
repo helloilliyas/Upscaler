@@ -3,7 +3,7 @@ name: Deploy Modal Backend
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, "claude/**"]
     paths:
       - "backend/**"
       - ".github/workflows/modal-deploy.yml"
