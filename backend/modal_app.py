@@ -118,6 +118,10 @@ standard_image = (
         "google-auth>=2.30",
     )
     .pip_install(
+        # Re-pin numpy<2 here: basicsr/realesrgan's transitive deps (scikit-image,
+        # scipy, numba, ...) otherwise pull NumPy 2.x, which torch 2.1.2 (built
+        # against NumPy 1.x) can't initialize -> "Numpy is not available" at load.
+        "numpy<2",
         "basicsr==1.4.2",
         "realesrgan==0.3.0",
         extra_options="--no-build-isolation",
