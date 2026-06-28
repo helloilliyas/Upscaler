@@ -27,8 +27,12 @@ jobs:
           python-version: "3.11"
           cache: pip
 
-      - name: Install Modal
-        run: pip install modal
+      - name: Install Modal and backend deps
+        # modal deploy imports the backend code locally to build the deployment
+        # graph, so the runtime deps (pydantic, Pillow, ...) must be present.
+        run: |
+          pip install modal
+          pip install -r requirements.txt
 
       - name: Deploy
         env:
