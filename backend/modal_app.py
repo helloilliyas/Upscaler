@@ -50,28 +50,25 @@ files_volume = modal.Volume.from_name("photo-restorer-files", create_if_missing=
 jobs_dict = modal.Dict.from_name("photo-restorer-jobs", create_if_missing=True)
 
 
-def download_standard_weights() -> None:
-    """Build-time step: fetch + verify Real-ESRGAN weights into MODELS_DIR.
+def _weight_download_commands() -> list[str]:
+    """Shell commands that fetch + verify each weight into MODELS_DIR at build.
 
-    Filesystem writes during ``run_function`` persist into the image layer, so
-    the weights ship inside the image and cold starts don't re-download them.
+    Run via ``Image.run_commands`` (stdlib-only ``python -c``) rather than
+    ``run_function`` so the build step never imports this module / the ``app``
+    package (which isn't in the GPU image until a later layer).
     """
-    import hashlib
-    import os
-    import urllib.request
-
-    os.makedirs(MODELS_DIR, exist_ok=True)
+    cmds = [f"mkdir -p {MODELS_DIR}"]
     for model in STANDARD_WEIGHTS:
-        dest = os.path.join(MODELS_DIR, f"{model['name']}.pth")
-        with urllib.request.urlopen(model["url"]) as resp, open(dest, "wb") as out:
-            while chunk := resp.read(1 << 20):
-                out.write(chunk)
-        digest = hashlib.sha256()
-        with open(dest, "rb") as fh:
-            for chunk in iter(lambda: fh.read(1 << 20), b""):
-                digest.update(chunk)
-        if digest.hexdigest() != model["sha256"]:
-            raise RuntimeError(f"SHA-256 mismatch for {model['name']}")
+        path = f"{MODELS_DIR}/{model['name']}.pth"
+        script = (
+            "import urllib.request, hashlib; "
+            f"p = {path!r}; "
+            f"urllib.request.urlretrieve({model['url']!r}, p); "
+            "h = hashlib.sha256(open(p, 'rb').read()).hexdigest(); "
+            f"assert h == {model['sha256']!r}, h"
+        )
+        cmds.append(f'python -c "{script}"')
+    return cmds
 
 
 # Lightweight image for the web layer (no torch / CUDA).
@@ -118,7 +115,7 @@ standard_image = (
         "realesrgan==0.3.0",
         extra_options="--no-build-isolation",
     )
-    .run_function(download_standard_weights)
+    .run_commands(*_weight_download_commands())
     .add_local_python_source("app")
 )
 
