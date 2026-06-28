@@ -21,9 +21,13 @@ from collections.abc import Iterator
 import modal
 from app.config import get_settings
 from app.jobs import JobService
-from app.main import create_app
 from app.storage import FileStore, MetadataStore
 from app.workers.processor import LocalPlaceholderProcessor
+
+# NOTE: app.main is imported lazily inside fastapi_app() (not here) because it
+# pulls in FastAPI, which is only installed in the web image. The GPU worker
+# containers also import this module, so a top-level FastAPI import would crash
+# them on startup.
 
 DATA_MOUNT = "/data"
 # Weights are baked into the standard image at build time (see below).
@@ -81,6 +85,9 @@ web_image = (
         "pydantic-settings>=2.3",
         "Pillow>=10.3",
         "google-auth>=2.30",
+        # google.auth.transport.requests needs the `requests` library; google-auth
+        # does not pull it in automatically. Without it, token verification 500s.
+        "requests>=2.31",
     )
     .add_local_python_source("app")
 )
@@ -257,6 +264,8 @@ class SpawnProcessor:
 )
 @modal.asgi_app()
 def fastapi_app():
+    from app.main import create_app  # lazy: FastAPI only exists in the web image
+
     settings = get_settings()
     files = ModalVolumeFileStore(DATA_MOUNT, files_volume)
     meta = ModalDictMetadataStore(jobs_dict)
