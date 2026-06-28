@@ -90,8 +90,13 @@ web_image = (
 
 # Standard GPU worker image: Real-ESRGAN stack + weights baked at build time.
 # torch 2.1.2 / torchvision 0.16.2 are pinned because basicsr imports
-# torchvision.transforms.functional_tensor, which was removed in torchvision
-# 0.17. numpy<2 keeps basicsr/torch happy.
+# torchvision.transforms.functional_tensor, which was removed in torchvision 0.17.
+#
+# basicsr/realesrgan are installed in a SECOND step with --no-build-isolation so
+# their setup.py sees the already-installed torch/numpy/cython instead of trying
+# to resolve build-time deps in isolation (which pulls conflicting CUDA eggs).
+# setuptools is pinned <70 because basicsr's legacy setup.py relies on
+# setuptools.installer APIs removed in newer versions.
 standard_image = (
     modal.Image.debian_slim(python_version="3.11")
     .apt_install("libgl1", "libglib2.0-0")
@@ -99,13 +104,19 @@ standard_image = (
         "torch==2.1.2",
         "torchvision==0.16.2",
         "numpy<2",
+        "cython",
+        "setuptools<70",
+        "wheel",
         "opencv-python-headless==4.9.0.80",
-        "realesrgan==0.3.0",
-        "basicsr==1.4.2",
         "Pillow>=10.3",
         "pydantic>=2.7",
         "pydantic-settings>=2.3",
         "google-auth>=2.30",
+    )
+    .pip_install(
+        "basicsr==1.4.2",
+        "realesrgan==0.3.0",
+        extra_options="--no-build-isolation",
     )
     .run_function(download_standard_weights)
     .add_local_python_source("app")
