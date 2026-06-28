@@ -9,7 +9,7 @@ GPU/model code.
 from __future__ import annotations
 
 import secrets
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 from pydantic import BaseModel, Field
 
@@ -26,7 +26,8 @@ from .storage import FileStore, MetadataStore, job_prefixes
 
 
 def _now() -> str:
-    return datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
+    # timezone.utc (not datetime.UTC) so the deploy client works on Python 3.10.
+    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
 def _new_job_id() -> str:
