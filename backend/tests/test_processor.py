@@ -86,3 +86,11 @@ def test_realesrgan_module_is_importable_without_torch(tmp_path):
 
     with pytest.raises(ValueError):
         RealEsrganUpscaler("not-a-model", str(tmp_path))
+
+
+def test_gfpgan_module_is_importable_without_torch(tmp_path):
+    # Constructing the face restorer must not import gfpgan/torch (load() does).
+    from app.pipelines.gfpgan_face import GfpganFaceRestorer
+
+    restorer = GfpganFaceRestorer(str(tmp_path))
+    assert restorer.weights_dir == str(tmp_path)

@@ -90,6 +90,13 @@ class RealEsrganUpscaler:
         )
         return self
 
+    @property
+    def upsampler(self) -> Any:
+        """The underlying RealESRGANer (e.g. for use as a GFPGAN background upsampler)."""
+        if self._upsampler is None:
+            self.load()
+        return self._upsampler
+
     def enhance(self, image: Image.Image) -> Image.Image:
         """Run one native-scale (4×) pass and return the upscaled RGB image."""
         if self._upsampler is None:

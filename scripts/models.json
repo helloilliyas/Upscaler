@@ -20,6 +20,16 @@
       "scale": 4,
       "license": "BSD-3-Clause (Real-ESRGAN); personal use OK",
       "reviewed": "2026-06-27"
+    },
+    {
+      "name": "GFPGANv1.4",
+      "url": "https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.4.pth",
+      "sha256": "e2cd4703ab14f4d01fd1383a8a8b266f9a5833dacee8e6a79d3bf21a1b6be5ad",
+      "bytes": 348632874,
+      "arch": "GFPGANv1Clean",
+      "scale": 4,
+      "license": "Apache-2.0 (GFPGAN); verify weights",
+      "reviewed": "2026-06-28"
     }
   ]
 }
