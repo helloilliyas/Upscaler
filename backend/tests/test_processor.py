@@ -94,3 +94,47 @@ def test_gfpgan_module_is_importable_without_torch(tmp_path):
 
     restorer = GfpganFaceRestorer(str(tmp_path))
     assert restorer.weights_dir == str(tmp_path)
+
+
+def test_lama_module_is_importable_without_torch(tmp_path):
+    # Constructing the inpainter must not import simple_lama/torch (load() does).
+    from app.pipelines.lama_inpaint import LamaInpainter
+
+    inpainter = LamaInpainter(str(tmp_path))
+    assert inpainter.weights_dir == str(tmp_path)
+    assert inpainter.model_path.endswith("big-lama.pt")
+
+
+def test_standard_processor_loads_repair_mask(tmp_path):
+    # The Restore path reads the stored mask back as an L image; a job without a
+    # mask (or with the blob missing) yields None and skips inpainting.
+    from app.storage import mask_path
+    from app.workers.standard_processor import StandardModelProcessor
+
+    files = LocalFileStore(tmp_path)
+    jobs = JobService(InMemoryMetadataStore(), files)
+    proc = StandardModelProcessor(jobs, files, weights_dir=str(tmp_path))
+
+    no_mask = jobs.create_job(
+        owner_sub="owner",
+        owner_email="e@example.com",
+        mode=RestorationMode.RESTORE,
+        output=OutputSize.X4,
+    )
+    assert proc._load_mask(jobs.get(no_mask.job_id)) is None
+
+    with_mask = jobs.create_job(
+        owner_sub="owner",
+        owner_email="e@example.com",
+        mode=RestorationMode.RESTORE,
+        output=OutputSize.X4,
+        has_mask=True,
+    )
+    buf = io.BytesIO()
+    Image.new("L", (16, 12), 255).save(buf, format="PNG")
+    files.write(mask_path("owner", with_mask.job_id), buf.getvalue())
+
+    loaded = proc._load_mask(jobs.get(with_mask.job_id))
+    assert loaded is not None
+    assert loaded.mode == "L"
+    assert loaded.size == (16, 12)

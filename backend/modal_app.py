@@ -8,10 +8,9 @@ This module imports ``modal`` and is intentionally excluded from the unit-test,
 lint, and type-check passes (it cannot run without the Modal runtime). The
 testable logic lives in ``backend/app``.
 
-Current status: the GPU workers run the placeholder resize processor so the end
-to end async flow is deployable today. Replace ``LocalPlaceholderProcessor``
-with the real Real-ESRGAN / CodeFormer / LaMa / SUPIR pipelines as each phase
-lands.
+Current status: the Standard worker runs the real pipelines — Real-ESRGAN
+(Natural) and GFPGAN faces + LaMa inpainting (Restore). The Ultra worker still
+runs the placeholder resize until the SUPIR pipeline lands.
 """
 
 from __future__ import annotations
@@ -51,6 +50,14 @@ STANDARD_WEIGHTS = [
         "url": "https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.4.pth",
         "sha256": "e2cd4703ab14f4d01fd1383a8a8b266f9a5833dacee8e6a79d3bf21a1b6be5ad",
     },
+    {
+        # LaMa inpainting (Restore-mode repair brush). Torchscript model; located
+        # at runtime via the LAMA_MODEL env var set on the standard image below.
+        "name": "big-lama",
+        "file": "big-lama.pt",
+        "url": "https://github.com/enesmsahin/simple-lama-inpainting/releases/download/v0.1.0/big-lama.pt",
+        "sha256": "7ba7aa7ac37a4d41fdbbeba3a2af7ead18058552997e3a3cd1a3b2210c9e6b4c",
+    },
 ]
 
 app = modal.App("ai-photo-restorer")
@@ -68,7 +75,7 @@ def _weight_download_commands() -> list[str]:
     """
     cmds = [f"mkdir -p {MODELS_DIR}"]
     for model in STANDARD_WEIGHTS:
-        path = f"{MODELS_DIR}/{model['name']}.pth"
+        path = f"{MODELS_DIR}/{model.get('file', model['name'] + '.pth')}"
         script = (
             "import urllib.request, hashlib; "
             f"p = {path!r}; "
@@ -131,7 +138,13 @@ standard_image = (
         "realesrgan==0.3.0",
         extra_options="--no-build-isolation",
     )
+    # LaMa wrapper, deps-free: it only needs torch / numpy / cv2 / Pillow, all
+    # already present, so --no-deps avoids pulling non-headless opencv-python.
+    .pip_install("simple-lama-inpainting==0.1.2", extra_options="--no-deps")
     .run_commands(*_weight_download_commands())
+    # SimpleLama reads LAMA_MODEL for a pre-baked checkpoint instead of fetching
+    # big-lama.pt from GitHub on first use.
+    .env({"LAMA_MODEL": f"{MODELS_DIR}/big-lama.pt"})
     .add_local_python_source("app")
 )
 
@@ -208,8 +221,8 @@ class StandardRestorer:
 
         self._files = ModalVolumeFileStore(DATA_MOUNT, files_volume)
         self._jobs = JobService(ModalDictMetadataStore(jobs_dict), self._files)
-        # Real-ESRGAN upscaling (Natural / Restore). CodeFormer + LaMa land in a
-        # later phase. half=True is safe on the L4 GPU.
+        # Real-ESRGAN (Natural), GFPGAN faces + LaMa inpainting (Restore).
+        # half=True is safe on the L4 GPU.
         self._processor = StandardModelProcessor(
             self._jobs, self._files, weights_dir=MODELS_DIR, tile=512, half=True
         )

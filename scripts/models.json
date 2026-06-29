@@ -30,6 +30,17 @@
       "scale": 4,
       "license": "Apache-2.0 (GFPGAN); verify weights",
       "reviewed": "2026-06-28"
+    },
+    {
+      "name": "big-lama",
+      "file": "big-lama.pt",
+      "url": "https://github.com/enesmsahin/simple-lama-inpainting/releases/download/v0.1.0/big-lama.pt",
+      "sha256": "7ba7aa7ac37a4d41fdbbeba3a2af7ead18058552997e3a3cd1a3b2210c9e6b4c",
+      "bytes": 205803670,
+      "arch": "LaMa (big-lama torchscript)",
+      "scale": 1,
+      "license": "Apache-2.0 (LaMa); inpainting model",
+      "reviewed": "2026-06-29"
     }
   ]
 }

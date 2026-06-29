@@ -72,7 +72,8 @@ previews vs. `RealESRGAN_x4plus` for final output).
 
 ## Current pipeline scope
 
-- ✅ Real-ESRGAN upscaling for **Natural** and the upscaling part of **Restore**.
-- ⏳ CodeFormer (faces) and LaMa (repair mask) — wired as stages later; Restore
-  currently runs the upscaler only.
+- ✅ Real-ESRGAN upscaling for **Natural** and the background of **Restore**.
+- ✅ GFPGAN face restoration for **Restore**.
+- ✅ LaMa inpainting for the **Restore** repair brush — when a mask is supplied
+  the painted regions are filled in before the face/background restore pass.
 - ⏳ Ultra (SUPIR) — the Ultra worker still runs the placeholder resize.
