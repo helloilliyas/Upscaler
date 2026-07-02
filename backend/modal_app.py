@@ -152,15 +152,16 @@ standard_image = _gpu_base.add_local_python_source("app")
 # x4 upscaler snapshot baked into the image (HF_HOME) so runtime never touches
 # the network. Versions chosen for torch 2.1.2 / numpy<2 compatibility.
 ULTRA_MODEL_ID = "stabilityai/stable-diffusion-x4-upscaler"
+# Pinned from the ULTRA_SNAPSHOT line of the first successful build (deploy run
+# 28628831411), so upstream repo changes can never alter what we ship.
+ULTRA_MODEL_REVISION = "572c99286543a273bfd17fac263db5a77be12c4c"
 HF_CACHE_DIR = f"{MODELS_DIR}/hf"
 
 _ULTRA_SNAPSHOT_CMD = (
     'python -c "'
     "from huggingface_hub import snapshot_download; "
-    f"p = snapshot_download({ULTRA_MODEL_ID!r}, "
+    f"p = snapshot_download({ULTRA_MODEL_ID!r}, revision={ULTRA_MODEL_REVISION!r}, "
     "ignore_patterns=['*.ckpt', 'x4-upscaler-ema.safetensors']); "
-    # The path ends in .../snapshots/<revision>; printed so the resolved
-    # revision is recorded in the deploy log (pin it in models.json from there).
     "print('ULTRA_SNAPSHOT', p)"
     '"'
 )
