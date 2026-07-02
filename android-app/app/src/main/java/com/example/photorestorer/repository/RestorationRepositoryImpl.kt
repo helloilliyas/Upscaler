@@ -32,6 +32,7 @@ class RestorationRepositoryImpl @Inject constructor(
         repairMaskUri: Uri?,
         mode: RestorationMode,
         output: OutputSize,
+        strength: Float,
         preserveMetadata: Boolean,
         idempotencyKey: String,
     ): SubmitJobResult {
@@ -55,6 +56,7 @@ class RestorationRepositoryImpl @Inject constructor(
             photo = photoPart,
             mode = MultipartBody.Part.createFormData("mode", mode.wire),
             output = MultipartBody.Part.createFormData("output", output.wire),
+            strength = MultipartBody.Part.createFormData("strength", strength.toString()),
             preserveMetadata = MultipartBody.Part.createFormData(
                 "preserve_metadata",
                 preserveMetadata.toString(),

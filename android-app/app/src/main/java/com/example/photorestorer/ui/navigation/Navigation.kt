@@ -1,5 +1,9 @@
 package com.example.photorestorer.ui.navigation
 
+import androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -32,7 +36,25 @@ fun PhotoRestorerNavHost(
     navController: NavHostController,
     startDestination: String,
 ) {
-    NavHost(navController = navController, startDestination = startDestination) {
+    val motion = tween<Float>(durationMillis = 280)
+    NavHost(
+        navController = navController,
+        startDestination = startDestination,
+        // Shared-axis X: new screen slides in from the trailing edge, old one eases
+        // out — a small motion cue that makes navigation feel intentional.
+        enterTransition = {
+            slideIntoContainer(SlideDirection.Start, tween(280)) + fadeIn(motion)
+        },
+        exitTransition = {
+            slideOutOfContainer(SlideDirection.Start, tween(280)) + fadeOut(motion)
+        },
+        popEnterTransition = {
+            slideIntoContainer(SlideDirection.End, tween(280)) + fadeIn(motion)
+        },
+        popExitTransition = {
+            slideOutOfContainer(SlideDirection.End, tween(280)) + fadeOut(motion)
+        },
+    ) {
         composable(Routes.AUTH) {
             AuthScreen(onAuthenticated = {
                 navController.navigate(Routes.HOME) {

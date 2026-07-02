@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Base XML theme; the actual UI colours are driven by the Compose theme. -->
+    <!-- Pre-Compose launch window. Colours are driven by the Compose theme; this
+         only styles the brief window before Compose draws, so it must track
+         day/night to avoid a white flash. Bars are transparent for edge-to-edge. -->
     <style name="Theme.PhotoRestorer" parent="android:Theme.Material.Light.NoActionBar">
-        <item name="android:statusBarColor">@color/purple_700</item>
-        <item name="android:windowBackground">@color/white</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowBackground">@color/brand_bg</item>
     </style>
 </resources>

@@ -2,6 +2,8 @@ package com.example.photorestorer.ui.batch
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,6 +20,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -34,8 +37,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.example.photorestorer.data.model.OutputSize
 import com.example.photorestorer.data.model.RestorationMode
+import kotlin.math.roundToInt
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun BatchReviewScreen(
     onBack: () -> Unit,
@@ -62,7 +66,7 @@ fun BatchReviewScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text("Mode", style = MaterialTheme.typography.titleSmall)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 RestorationMode.entries.forEach { mode ->
                     FilterChip(
                         selected = state.mode == mode,
@@ -73,7 +77,7 @@ fun BatchReviewScreen(
             }
 
             Text("Output", style = MaterialTheme.typography.titleSmall)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutputSize.entries.forEach { output ->
                     FilterChip(
                         selected = state.output == output,
@@ -81,6 +85,31 @@ fun BatchReviewScreen(
                         label = { Text(output.label) },
                     )
                 }
+            }
+
+            if (state.mode != RestorationMode.ULTRA) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("Strength", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        "${(state.strength * 100).roundToInt()}%",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                Slider(
+                    value = state.strength,
+                    onValueChange = viewModel::setStrength,
+                    valueRange = 0f..1f,
+                )
+                Text(
+                    "Lower for a gentler, more natural result; 100% applies the full effect.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {

@@ -21,6 +21,7 @@ data class RestorationRequest(
     val maskUri: String?,
     val mode: RestorationMode,
     val output: OutputSize,
+    val strength: Float,
     val preserveMetadata: Boolean,
     val idempotencyKey: String,
     val wifiOnly: Boolean,
@@ -49,6 +50,7 @@ class RestorationScheduler @Inject constructor(
             .putString(WorkKeys.MASK_URI, request.maskUri)
             .putString(WorkKeys.MODE, request.mode.wire)
             .putString(WorkKeys.OUTPUT, request.output.wire)
+            .putFloat(WorkKeys.STRENGTH, request.strength)
             .putBoolean(WorkKeys.PRESERVE_METADATA, request.preserveMetadata)
             .putString(WorkKeys.IDEMPOTENCY_KEY, request.idempotencyKey)
             .putBoolean(WorkKeys.DELETE_AFTER_DOWNLOAD, request.deleteAfterDownload)

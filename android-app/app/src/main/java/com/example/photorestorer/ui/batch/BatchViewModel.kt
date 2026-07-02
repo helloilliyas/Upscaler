@@ -24,6 +24,7 @@ data class BatchUiState(
     val photos: List<Uri> = emptyList(),
     val mode: RestorationMode = RestorationMode.NATURAL,
     val output: OutputSize = OutputSize.X4,
+    val strength: Float = 1f,
     val wifiOnly: Boolean = false,
     val maskedPhotos: Set<String> = emptySet(),
 )
@@ -61,6 +62,7 @@ class BatchViewModel @Inject constructor(
 
     fun setMode(mode: RestorationMode) = _uiState.update { it.copy(mode = mode) }
     fun setOutput(output: OutputSize) = _uiState.update { it.copy(output = output) }
+    fun setStrength(value: Float) = _uiState.update { it.copy(strength = value) }
     fun setWifiOnly(value: Boolean) = _uiState.update { it.copy(wifiOnly = value) }
 
     fun removePhoto(uri: Uri) {
@@ -86,6 +88,7 @@ class BatchViewModel @Inject constructor(
                         maskUri = maskUri,
                         mode = state.mode,
                         output = state.output,
+                        strength = state.strength,
                         preserveMetadata = !settings.removeLocationMetadata,
                         idempotencyKey = UUID.randomUUID().toString(),
                         wifiOnly = state.wifiOnly,

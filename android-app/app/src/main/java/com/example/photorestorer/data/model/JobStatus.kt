@@ -27,6 +27,17 @@ enum class JobStatus(val wire: String) {
     val isTerminal: Boolean
         get() = this == COMPLETED || this == FAILED || this == CANCELLED || this == EXPIRED
 
+    /** User-facing label (never show the raw wire value in the UI). */
+    val label: String
+        get() = when (this) {
+            QUEUED -> "Queued"
+            PROCESSING -> "Processing"
+            COMPLETED -> "Completed"
+            FAILED -> "Failed"
+            CANCELLED -> "Cancelled"
+            EXPIRED -> "Expired"
+        }
+
     companion object {
         fun fromWire(value: String?): JobStatus =
             entries.firstOrNull { it.wire == value } ?: QUEUED

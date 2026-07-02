@@ -29,6 +29,7 @@ interface RestorationApi {
         @Part photo: MultipartBody.Part,
         @Part mode: MultipartBody.Part,
         @Part output: MultipartBody.Part,
+        @Part strength: MultipartBody.Part,
         @Part preserveMetadata: MultipartBody.Part,
         @Part repairMask: MultipartBody.Part? = null,
     ): Response<SubmitJobResponseDto>

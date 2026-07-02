@@ -83,7 +83,7 @@ class StandardModelProcessor:
         if mode == RestorationMode.RESTORE:
             enhance = self._restore_enhance(record)
         else:
-            enhance = self._natural_enhance()
+            enhance = self._natural_enhance(record.strength)
 
         run_image_job(self._jobs, self._files, job_id, enhance)
 
@@ -96,13 +96,15 @@ class StandardModelProcessor:
             return None
         return Image.open(io.BytesIO(self._files.read(path))).convert("L")
 
-    def _natural_enhance(self):
+    def _natural_enhance(self, strength: float):
         upscaler = self._upscaler(_DEFAULT_MODEL)
 
         def enhance(
             image: Image.Image, mode: RestorationMode, output: OutputSize
         ) -> EnhanceOutcome:
-            restored = _fit(upscaler.enhance(image), image, output)
+            restored = _blend_to_target(
+                upscaler.enhance(image), image, image, output, strength
+            )
             return EnhanceOutcome(restored, Fidelity.HIGH, None)
 
         return enhance
@@ -119,15 +121,38 @@ class StandardModelProcessor:
             # cleaned image so defects don't get sharpened along with everything.
             mask = self._load_mask(record)
             working = self._inpaint().inpaint(image, mask) if mask is not None else image
-            restored = _fit(faces.restore(working), image, output)
+            # Blend against the inpainted `working`, not the raw source, so easing
+            # the strength never brings a painted-out defect back.
+            restored = _blend_to_target(
+                faces.restore(working), working, image, output, record.strength
+            )
             return EnhanceOutcome(restored, Fidelity.MODERATE, "low")
 
         return enhance
 
 
-def _fit(restored: Image.Image, source: Image.Image, output: OutputSize) -> Image.Image:
-    """Resize a native-4× result to the requested output box (one model pass)."""
+def _blend_to_target(
+    model_output: Image.Image,
+    baseline: Image.Image,
+    source: Image.Image,
+    output: OutputSize,
+    strength: float,
+) -> Image.Image:
+    """Fit the native-4× result to the output box, blended over the baseline.
+
+    ``strength`` in [0, 1] dials how much of the model output shows through: 1.0
+    is the pure model result; lower values mix in a plain Lanczos upscale of the
+    baseline for a gentler, more natural effect. Sizing is always computed from
+    the original ``source`` so the box is independent of the blend.
+    """
     target = compute_target_size(source.width, source.height, output)
-    if restored.size == target:
-        return restored
-    return restored.resize(target, Image.Resampling.LANCZOS)
+    fitted = model_output
+    if fitted.size != target:
+        fitted = fitted.resize(target, Image.Resampling.LANCZOS)
+    if strength >= 0.999:
+        return fitted
+    base = baseline if baseline.size == target else baseline.resize(
+        target, Image.Resampling.LANCZOS
+    )
+    # Image.blend(a, b, alpha) = a*(1-alpha) + b*alpha.
+    return Image.blend(base, fitted, max(0.0, min(1.0, strength)))

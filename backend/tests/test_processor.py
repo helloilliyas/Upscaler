@@ -105,6 +105,35 @@ def test_lama_module_is_importable_without_torch(tmp_path):
     assert inpainter.model_path.endswith("big-lama.pt")
 
 
+def test_blend_to_target_respects_strength():
+    from app.workers.standard_processor import _blend_to_target
+
+    source = Image.new("RGB", (16, 12))  # 4x -> 64x48 target
+    model = Image.new("RGB", (64, 48), (255, 255, 255))
+    base = Image.new("RGB", (64, 48), (0, 0, 0))
+
+    full = _blend_to_target(model, base, source, OutputSize.X4, 1.0)
+    assert full.size == (64, 48)
+    assert full.getpixel((0, 0)) == (255, 255, 255)  # pure model output
+
+    none = _blend_to_target(model, base, source, OutputSize.X4, 0.0)
+    assert none.getpixel((0, 0)) == (0, 0, 0)  # pure baseline
+
+    half = _blend_to_target(model, base, source, OutputSize.X4, 0.5)
+    # 0*0.5 + 255*0.5 -> ~127 on every channel.
+    assert all(120 <= c <= 135 for c in half.getpixel((0, 0)))
+
+
+def test_blend_to_target_resizes_model_output_to_box():
+    from app.workers.standard_processor import _blend_to_target
+
+    source = Image.new("RGB", (16, 12))
+    # A native-4x model output already at the target box is returned as-is at 1.0.
+    model = Image.new("RGB", (100, 80))
+    fitted = _blend_to_target(model, source, source, OutputSize.X4, 1.0)
+    assert fitted.size == (64, 48)
+
+
 def test_standard_processor_loads_repair_mask(tmp_path):
     # The Restore path reads the stored mask back as an L image; a job without a
     # mask (or with the blob missing) yields None and skips inpainting.

@@ -54,6 +54,9 @@ class JobRecord(BaseModel):
     mode: RestorationMode
     output: OutputSize
     has_mask: bool = False
+    # Enhancement intensity in [0, 1]: how strongly the AI result is blended over
+    # the (inpainted) source. 1.0 = full model output; lower eases the effect.
+    strength: float = 1.0
     preserve_metadata: bool = False
     created_at: str = Field(default_factory=_now)
     updated_at: str = Field(default_factory=_now)
@@ -86,6 +89,7 @@ class JobService:
         mode: RestorationMode,
         output: OutputSize,
         has_mask: bool = False,
+        strength: float = 1.0,
         preserve_metadata: bool = False,
         idempotency_key: str | None = None,
     ) -> JobRecord:
@@ -104,6 +108,7 @@ class JobService:
             mode=mode,
             output=output,
             has_mask=has_mask,
+            strength=max(0.0, min(1.0, strength)),
             preserve_metadata=preserve_metadata,
         )
         self._save(record)

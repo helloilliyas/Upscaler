@@ -6,6 +6,7 @@ object WorkKeys {
     const val MASK_URI = "mask_uri"
     const val MODE = "mode"
     const val OUTPUT = "output"
+    const val STRENGTH = "strength"
     const val PRESERVE_METADATA = "preserve_metadata"
     const val IDEMPOTENCY_KEY = "idempotency_key"
     const val DELETE_AFTER_DOWNLOAD = "delete_after_download"

@@ -3,15 +3,18 @@ package com.example.photorestorer.ui.result
 import android.content.Intent
 import androidx.core.net.toUri
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -23,7 +26,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -70,34 +75,47 @@ fun ResultScreen(
         },
     ) { padding ->
         val current = job
+        if (current == null) {
+            Box(
+                modifier = Modifier.fillMaxSize().padding(padding),
+                contentAlignment = Alignment.Center,
+            ) { CircularProgressIndicator() }
+            return@Scaffold
+        }
+
         Column(
             modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            if (current == null) {
-                Text("Loading…")
-                return@Column
-            }
-
             val shown = if (showingOriginal) current.originalUri else current.resultUri
             AsyncImage(
                 model = shown,
                 contentDescription = if (showingOriginal) "Original" else "Restored",
-                modifier = Modifier.fillMaxWidth().weight(1f),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .clip(RoundedCornerShape(16.dp)),
                 contentScale = ContentScale.Fit,
             )
 
-            current.fidelity?.let { Text("Fidelity: ${it.label}") }
+            current.fidelity?.let {
+                Text(
+                    it.label,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
 
-            Button(
+            FilledTonalButton(
                 onClick = { showingOriginal = !showingOriginal },
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text(if (showingOriginal) "Show restored" else "Show original")
+                Text(if (showingOriginal) "Show restored" else "Compare with original")
             }
             Text(
                 "Saved to Gallery under Pictures/PhotoRestorer.",
                 style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }

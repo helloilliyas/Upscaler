@@ -45,6 +45,7 @@ interface RestorationRepository {
         repairMaskUri: Uri?,
         mode: RestorationMode,
         output: OutputSize,
+        strength: Float,
         preserveMetadata: Boolean,
         idempotencyKey: String,
     ): SubmitJobResult

@@ -33,6 +33,7 @@ class SubmitJobWorker @AssistedInject constructor(
         val maskUri = inputData.getString(WorkKeys.MASK_URI)?.let(Uri::parse)
         val mode = RestorationMode.fromWire(inputData.getString(WorkKeys.MODE) ?: "natural")
         val output = OutputSize.fromWire(inputData.getString(WorkKeys.OUTPUT) ?: "2x")
+        val strength = inputData.getFloat(WorkKeys.STRENGTH, 1f)
         val preserve = inputData.getBoolean(WorkKeys.PRESERVE_METADATA, false)
         val idempotencyKey = inputData.getString(WorkKeys.IDEMPOTENCY_KEY)
             ?: return Result.failure()
@@ -43,6 +44,7 @@ class SubmitJobWorker @AssistedInject constructor(
                 repairMaskUri = maskUri,
                 mode = mode,
                 output = output,
+                strength = strength,
                 preserveMetadata = preserve,
                 idempotencyKey = idempotencyKey,
             )

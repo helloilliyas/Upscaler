@@ -71,6 +71,7 @@ async def submit_job(
     photo: UploadFile,
     mode: str = Form(...),
     output: str = Form(...),
+    strength: float = Form(default=1.0, ge=0.0, le=1.0),
     preserve_metadata: bool = Form(default=False),
     crop_json: str | None = Form(default=None),
     rotation: int = Form(default=0),
@@ -107,6 +108,7 @@ async def submit_job(
         mode=parsed_mode,
         output=parsed_output,
         has_mask=mask_image is not None,
+        strength=strength,
         preserve_metadata=preserve_metadata,
         idempotency_key=idempotency_key,
     )
