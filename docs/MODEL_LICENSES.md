@@ -16,7 +16,8 @@ status, and the date reviewed.
 | Real-ESRGAN | Standard restoration / upscaling | BSD-3-Clause repo; weights personal-use OK | 2026-06-27 |
 | CodeFormer | Face restoration | **Non-commercial** S-Lab terms | _pending_ |
 | LaMa | Inpainting / scratch repair (Restore brush) | Apache-2.0 repo + big-lama weights; pinned SHA-256 | 2026-06-29 |
-| SUPIR | Ultra Detail generative restoration | **Explicit non-commercial restrictions** | _pending_ |
+| SD x4 upscaler | Ultra Detail generative upscaling | CreativeML Open RAIL++-M; personal use OK | 2026-07-03 |
+| SUPIR | (not shipped; possible Ultra upgrade) | **Explicit non-commercial restrictions** | _pending_ |
 | GFPGAN | Face restoration (Restore) | Apache-2.0 repo; weights verify | 2026-06-28 |
 | FastAPI | Backend framework | Permissive (MIT) | n/a |
 | Modal | Cloud infrastructure | Paid service terms / pricing apply | n/a |

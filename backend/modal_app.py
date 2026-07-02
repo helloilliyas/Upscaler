@@ -8,9 +8,9 @@ This module imports ``modal`` and is intentionally excluded from the unit-test,
 lint, and type-check passes (it cannot run without the Modal runtime). The
 testable logic lives in ``backend/app``.
 
-Current status: the Standard worker runs the real pipelines — Real-ESRGAN
-(Natural) and GFPGAN faces + LaMa inpainting (Restore). The Ultra worker still
-runs the placeholder resize until the SUPIR pipeline lands.
+Current status: all three modes run real pipelines. Standard worker: Real-ESRGAN
+(Natural) and GFPGAN faces + LaMa inpainting (Restore). Ultra worker: Stability
+x4 latent-diffusion upscaler (Ultra Detail, generative).
 """
 
 from __future__ import annotations
@@ -21,7 +21,6 @@ import modal
 from app.config import get_settings
 from app.jobs import JobService
 from app.storage import FileStore, MetadataStore
-from app.workers.processor import LocalPlaceholderProcessor
 
 # NOTE: app.main is imported lazily inside fastapi_app() (not here) because it
 # pulls in FastAPI, which is only installed in the web image. The GPU worker
@@ -104,7 +103,7 @@ web_image = (
     .add_local_python_source("app")
 )
 
-# Standard GPU worker image: Real-ESRGAN stack + weights baked at build time.
+# Shared GPU base image: Real-ESRGAN/GFPGAN/LaMa stack + weights baked at build.
 # torch 2.1.2 / torchvision 0.16.2 are pinned because basicsr imports
 # torchvision.transforms.functional_tensor, which was removed in torchvision 0.17.
 #
@@ -113,7 +112,7 @@ web_image = (
 # to resolve build-time deps in isolation (which pulls conflicting CUDA eggs).
 # setuptools is pinned <70 because basicsr's legacy setup.py relies on
 # setuptools.installer APIs removed in newer versions.
-standard_image = (
+_gpu_base = (
     modal.Image.debian_slim(python_version="3.11")
     .apt_install("libgl1", "libglib2.0-0")
     .pip_install(
@@ -145,6 +144,38 @@ standard_image = (
     # SimpleLama reads LAMA_MODEL for a pre-baked checkpoint instead of fetching
     # big-lama.pt from GitHub on first use.
     .env({"LAMA_MODEL": f"{MODELS_DIR}/big-lama.pt"})
+)
+
+standard_image = _gpu_base.add_local_python_source("app")
+
+# Ultra worker image: the shared base + the diffusers stack, with the Stability
+# x4 upscaler snapshot baked into the image (HF_HOME) so runtime never touches
+# the network. Versions chosen for torch 2.1.2 / numpy<2 compatibility.
+ULTRA_MODEL_ID = "stabilityai/stable-diffusion-x4-upscaler"
+HF_CACHE_DIR = f"{MODELS_DIR}/hf"
+
+_ULTRA_SNAPSHOT_CMD = (
+    'python -c "'
+    "from huggingface_hub import snapshot_download; "
+    f"p = snapshot_download({ULTRA_MODEL_ID!r}, "
+    "ignore_patterns=['*.ckpt', 'x4-upscaler-ema.safetensors']); "
+    # The path ends in .../snapshots/<revision>; printed so the resolved
+    # revision is recorded in the deploy log (pin it in models.json from there).
+    "print('ULTRA_SNAPSHOT', p)"
+    '"'
+)
+
+ultra_image = (
+    _gpu_base.pip_install(
+        "numpy<2",
+        "diffusers==0.27.2",
+        "transformers==4.38.2",
+        "accelerate==0.27.2",
+        # Pinned so resolver drift can't hand diffusers an incompatible hub.
+        "huggingface_hub==0.25.2",
+    )
+    .env({"HF_HOME": HF_CACHE_DIR})
+    .run_commands(_ULTRA_SNAPSHOT_CMD)
     .add_local_python_source("app")
 )
 
@@ -236,17 +267,19 @@ class StandardRestorer:
 @app.cls(
     gpu="L40S",
     timeout=30 * 60,
-    image=web_image,
+    image=ultra_image,
     volumes={DATA_MOUNT: files_volume},
 )
 class UltraRestorer:
     @modal.enter()
     def load_models(self) -> None:
-        # TODO: Phase 6 — load SUPIR + supporting diffusion components. For now
-        # the Ultra worker runs the placeholder resize on the lightweight image.
+        from app.workers.ultra_processor import UltraModelProcessor
+
         self._files = ModalVolumeFileStore(DATA_MOUNT, files_volume)
         self._jobs = JobService(ModalDictMetadataStore(jobs_dict), self._files)
-        self._processor = LocalPlaceholderProcessor(self._jobs, self._files)
+        # Generative diffusion upscaling (Ultra Detail). fp16 on the L40S.
+        self._processor = UltraModelProcessor(self._jobs, self._files)
+        self._processor.warmup()
 
     @modal.method()
     def process(self, job_id: str) -> None:

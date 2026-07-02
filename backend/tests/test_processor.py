@@ -105,6 +105,75 @@ def test_lama_module_is_importable_without_torch(tmp_path):
     assert inpainter.model_path.endswith("big-lama.pt")
 
 
+def test_diffusion_module_is_importable_without_torch():
+    # Constructing the upscaler must not import torch/diffusers (load() does).
+    from app.pipelines.diffusion_upscale import MODEL_ID, DiffusionUpscaler
+
+    upscaler = DiffusionUpscaler()
+    assert upscaler.model_id == MODEL_ID
+    assert upscaler.tile > upscaler.overlap > 0
+
+
+def test_tile_origins_cover_the_full_length():
+    from app.pipelines.diffusion_upscale import tile_origins
+
+    # Smaller than one tile -> single origin.
+    assert tile_origins(100, 384, 336) == [0]
+    assert tile_origins(384, 384, 336) == [0]
+    # Exact stride fit.
+    assert tile_origins(720, 384, 336) == [0, 336]
+    # Non-exact fit appends a final end-aligned origin.
+    assert tile_origins(721, 384, 336) == [0, 336, 337]
+    # Every pixel is covered by at least one tile.
+    for length in (385, 500, 1280, 1337):
+        origins = tile_origins(length, 384, 336)
+        assert origins[0] == 0
+        assert origins[-1] + 384 == length
+        for prev, nxt in zip(origins, origins[1:], strict=False):
+            assert nxt <= prev + 384  # no gap between consecutive tiles
+
+
+def test_diffusion_stitching_is_seamless_and_exact_4x():
+    # Stub the per-tile GPU call with a plain 4x resize; the stitching
+    # (padding, tiling, feather-blend, crop) is exercised for real on CPU.
+    pytest.importorskip("numpy")
+    from app.pipelines.diffusion_upscale import DiffusionUpscaler
+
+    upscaler = DiffusionUpscaler(tile=64, overlap=16)
+    upscaler._pipe = object()  # pretend load() already ran
+    upscaler._tile_output = lambda tile_img, seed: tile_img.resize(  # type: ignore[method-assign]
+        (tile_img.width * 4, tile_img.height * 4), Image.Resampling.LANCZOS
+    )
+
+    # 150x90 is deliberately not a multiple of 64 -> exercises reflection pad.
+    src = Image.new("RGB", (150, 90), (37, 141, 201))
+    out = upscaler.upscale(src)
+
+    assert out.size == (600, 360)  # exactly 4x, padding cropped away
+    # A constant image must come out exactly constant: proves the overlapping
+    # feather weights normalise to 1 everywhere (no seams, no dark edges).
+    assert out.getextrema() == ((37, 37), (141, 141), (201, 201))
+
+
+def test_capped_size_shrinks_but_never_grows():
+    from app.pipelines.diffusion_upscale import capped_size
+
+    assert capped_size(4000, 3000, 1280) == (1280, 960)
+    assert capped_size(3000, 4000, 1280) == (960, 1280)
+    assert capped_size(800, 600, 1280) == (800, 600)  # never upscales
+    w, h = capped_size(5, 9000, 1280)
+    assert w >= 1 and h == 1280
+
+
+def test_ultra_processor_is_importable_without_torch(tmp_path):
+    from app.workers.ultra_processor import UltraModelProcessor
+
+    files = LocalFileStore(tmp_path)
+    jobs = JobService(InMemoryMetadataStore(), files)
+    processor = UltraModelProcessor(jobs, files)
+    assert processor is not None
+
+
 def test_blend_to_target_respects_strength():
     from app.workers.standard_processor import _blend_to_target
 

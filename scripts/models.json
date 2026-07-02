@@ -41,6 +41,16 @@
       "scale": 1,
       "license": "Apache-2.0 (LaMa); inpainting model",
       "reviewed": "2026-06-29"
+    },
+    {
+      "name": "stable-diffusion-x4-upscaler",
+      "source": "huggingface",
+      "url": "https://huggingface.co/stabilityai/stable-diffusion-x4-upscaler",
+      "sha256": "n/a (HF snapshot; resolved revision printed as ULTRA_SNAPSHOT in the modal-deploy build log — pin here once recorded)",
+      "arch": "Latent diffusion (SD 2.x upscaler)",
+      "scale": 4,
+      "license": "CreativeML Open RAIL++-M; personal use OK",
+      "reviewed": "2026-07-03"
     }
   ]
 }

@@ -76,4 +76,6 @@ previews vs. `RealESRGAN_x4plus` for final output).
 - ✅ GFPGAN face restoration for **Restore**.
 - ✅ LaMa inpainting for the **Restore** repair brush — when a mask is supplied
   the painted regions are filled in before the face/background restore pass.
-- ⏳ Ultra (SUPIR) — the Ultra worker still runs the placeholder resize.
+- ✅ **Ultra Detail** — Stability's x4 latent-diffusion upscaler (tiled,
+  feather-blended) generates new texture/detail on the L40S. Chosen over SUPIR
+  as the deploy-ready generative engine; SUPIR remains a possible upgrade.
