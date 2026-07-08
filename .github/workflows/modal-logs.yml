@@ -1,0 +1,30 @@
+name: Modal Logs
+
+# Debugging aid for a phone-only workflow: dumps recent logs from the deployed
+# Modal app (worker exceptions included) into the Actions run output.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  logs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Modal
+        run: pip install modal
+
+      - name: Dump recent app logs
+        env:
+          MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+          MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+        # `modal app logs` streams forever; bound it and keep the tail.
+        run: |
+          timeout 60 modal app logs ai-photo-restorer > logs.txt 2>&1 || true
+          tail -c 200000 logs.txt
