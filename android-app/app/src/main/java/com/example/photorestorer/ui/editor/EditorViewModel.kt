@@ -61,15 +61,13 @@ class EditorViewModel @Inject constructor(
             _uiState.update { it.copy(loading = false) }
         } else {
             viewModelScope.launch {
-                val (bitmap, size) = withContext(Dispatchers.IO) {
-                    val bmp = OrientedImage.loadDownsampled(context, uri, DISPLAY_MAX_EDGE)
-                    val sz = OrientedImage.size(context, uri)
-                    bmp to sz
+                val photo = withContext(Dispatchers.IO) {
+                    OrientedImage.load(context, uri, DISPLAY_MAX_EDGE)
                 }
                 _uiState.update {
                     it.copy(
-                        bitmap = bitmap?.asImageBitmap(),
-                        imageSize = size,
+                        bitmap = photo?.bitmap?.asImageBitmap(),
+                        imageSize = photo?.fullSize,
                         loading = false,
                     )
                 }
