@@ -105,6 +105,55 @@ def test_lama_module_is_importable_without_torch(tmp_path):
     assert inpainter.model_path.endswith("big-lama.pt")
 
 
+def test_lama_inpaint_composites_only_the_masked_region():
+    # Stub the model with a solid-red fill; the surrounding logic (binarize,
+    # dilate, downscale, crop, feathered composite) runs for real on CPU.
+    from app.pipelines.lama_inpaint import LamaInpainter
+
+    inpainter = LamaInpainter("/nonexistent")
+    inpainter._lama = lambda img, msk: Image.new("RGB", img.size, (255, 0, 0))
+
+    src = Image.new("RGB", (400, 300), (10, 120, 40))
+    mask = Image.new("L", (400, 300), 0)
+    for x in range(180, 220):  # 40px square hole in the middle
+        for y in range(130, 170):
+            mask.putpixel((x, y), 255)
+
+    out = inpainter.inpaint(src, mask)
+    assert out.size == (400, 300)
+    # Center of the hole is the model's fill.
+    assert out.getpixel((200, 150)) == (255, 0, 0)
+    # Far from the hole (beyond dilation+feather) the original is bit-identical.
+    assert out.getpixel((10, 10)) == (10, 120, 40)
+    assert out.getpixel((390, 290)) == (10, 120, 40)
+
+
+def test_lama_inpaint_caps_working_resolution_for_large_images():
+    from app.pipelines.lama_inpaint import _WORK_EDGE, LamaInpainter
+
+    seen_sizes = []
+    inpainter = LamaInpainter("/nonexistent")
+
+    def fake_lama(img, msk):
+        seen_sizes.append(img.size)
+        assert img.size == msk.size
+        return Image.new("RGB", img.size, (255, 0, 0))
+
+    inpainter._lama = fake_lama
+
+    src = Image.new("RGB", (4000, 3000), (10, 120, 40))
+    mask = Image.new("L", (4000, 3000), 0)
+    for x in range(1900, 2100):
+        for y in range(1400, 1600):
+            mask.putpixel((x, y), 255)
+
+    out = inpainter.inpaint(src, mask)
+    assert out.size == (4000, 3000)
+    assert max(seen_sizes[0]) == _WORK_EDGE  # model ran at the capped size
+    assert out.getpixel((2000, 1500)) == (255, 0, 0)
+    assert out.getpixel((100, 100)) == (10, 120, 40)
+
+
 def test_diffusion_module_is_importable_without_torch():
     # Constructing the upscaler must not import torch/diffusers (load() does).
     from app.pipelines.diffusion_upscale import MODEL_ID, DiffusionUpscaler

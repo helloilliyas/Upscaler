@@ -20,6 +20,11 @@ from PIL import Image
 
 _WEIGHT_FILE = "big-lama.pt"
 
+# Working long edge for the fill pass. Big holes need to be small relative to
+# LaMa's receptive field to get structure instead of smudge; the composite step
+# keeps the full-resolution pixels everywhere outside the mask.
+_WORK_EDGE = 1280
+
 
 class LamaInpainter:
     """Inpaints masked regions of an image with the LaMa big-lama model."""
@@ -46,18 +51,55 @@ class LamaInpainter:
 
         ``mask`` is a grayscale image the same size as ``image``; any non-black
         pixel marks a region to repaint. The result keeps the input resolution.
+
+        Large removals (a person, a car) are filled at a capped working
+        resolution: LaMa's receptive field is small relative to a big hole at
+        full resolution, which yields smeary averages. Shrinking makes the hole
+        small enough for real structure to form; the fill is then upscaled and
+        composited back so every unmasked pixel stays bit-identical.
         """
         if self._lama is None:
             self.load()
 
-        rgb = image.convert("RGB")
-        # The wrapper treats any non-zero mask pixel as a region to inpaint; keep
-        # a hard binary mask so anti-aliased brush edges don't bleed.
-        binary = mask.convert("L").point(lambda v: 255 if v > 0 else 0)
-        result = self._lama(rgb, binary)
+        from PIL import ImageFilter
 
-        # big-lama pads to a multiple of 8 internally and crops back, but guard
-        # against any off-by-padding so callers can rely on size == input size.
-        if result.size != rgb.size:
-            result = result.resize(rgb.size, Image.Resampling.LANCZOS)
-        return result.convert("RGB")
+        rgb = image.convert("RGB")
+        width, height = rgb.size
+        long_edge = max(width, height)
+
+        # Hard-binarize: anti-aliased brush edges must not bleed.
+        binary = mask.convert("L").point(lambda v: 255 if v > 0 else 0)
+
+        def dilate(m: Image.Image) -> Image.Image:
+            # Grow the mask ~1% past the painted outline: a surviving rim of
+            # the removed object poisons the fill with its colours (ghosting).
+            # Runs at the working size, where MaxFilter (O(n*k^2)) stays cheap.
+            k = max(3, int(max(m.size) * 0.01) // 2 * 2 + 1)  # odd kernel
+            return m.filter(ImageFilter.MaxFilter(k))
+
+        if long_edge > _WORK_EDGE:
+            scale = _WORK_EDGE / long_edge
+            small = (max(1, round(width * scale)), max(1, round(height * scale)))
+            small_mask = dilate(binary.resize(small, Image.Resampling.NEAREST))
+            filled = self._fill(
+                rgb.resize(small, Image.Resampling.LANCZOS), small_mask
+            ).resize((width, height), Image.Resampling.LANCZOS)
+            dilated = small_mask.resize((width, height), Image.Resampling.NEAREST)
+        else:
+            dilated = dilate(binary)
+            filled = self._fill(rgb, dilated)
+
+        # Paste only the filled region over the pristine original, with a soft
+        # edge. The feather ramp lives inside the dilated margin (background),
+        # never over the removed object, so nothing ghosts back in.
+        feather = max(3, int(long_edge * 0.004))
+        soft = dilated.filter(ImageFilter.GaussianBlur(feather))
+        return Image.composite(filled, rgb, soft).convert("RGB")
+
+    def _fill(self, image: Image.Image, mask: Image.Image) -> Image.Image:
+        """One LaMa pass. The model pads to a multiple of 8 and returns the
+        padded canvas; crop (not resize) back to the input size."""
+        result = self._lama(image, mask)
+        if result.size != image.size:
+            result = result.crop((0, 0, image.width, image.height))
+        return result
