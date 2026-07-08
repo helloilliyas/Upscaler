@@ -4,6 +4,7 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffXfermode
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -54,21 +55,26 @@ fun EditorScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
+    // Every exit path saves the mask — losing painted strokes to a reflexive
+    // back-press was the original sin that shipped Restore jobs mask-less.
+    val saveAndLeave = { if (!state.saving) viewModel.save(onDone) }
+    BackHandler(enabled = true) { saveAndLeave() }
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Repair brush") },
                 navigationIcon = {
-                    IconButton(onClick = onDone) {
+                    IconButton(onClick = saveAndLeave, enabled = !state.saving) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 actions = {
                     TextButton(
-                        onClick = { viewModel.save(onDone) },
+                        onClick = saveAndLeave,
                         enabled = !state.saving,
                     ) {
-                        Text(if (state.hasMask) "Save mask" else "Done")
+                        Text("Done")
                     }
                 },
             )

@@ -62,12 +62,45 @@ class SubmitJobWorker @AssistedInject constructor(
             )
             Result.success(Data.Builder().putString(WorkKeys.JOB_ID, result.jobId).build())
         } catch (e: RemoteJobException) {
-            if (e.retryable && runAttemptCount < MAX_ATTEMPTS) Result.retry()
-            else Result.failure(errorData(e.message, e.code))
+            if (e.retryable && runAttemptCount < MAX_ATTEMPTS) {
+                Result.retry()
+            } else {
+                recordFailure(photoUri, mode, output, idempotencyKey, e.message, e.code)
+                Result.failure(errorData(e.message, e.code))
+            }
         } catch (e: Exception) {
-            if (runAttemptCount < MAX_ATTEMPTS) Result.retry()
-            else Result.failure(errorData(e.message, null))
+            if (runAttemptCount < MAX_ATTEMPTS) {
+                Result.retry()
+            } else {
+                recordFailure(photoUri, mode, output, idempotencyKey, e.message, null)
+                Result.failure(errorData(e.message, null))
+            }
         }
+    }
+
+    /** A rejected submit must be visible in History, not silently dropped. */
+    private suspend fun recordFailure(
+        photoUri: Uri,
+        mode: RestorationMode,
+        output: OutputSize,
+        idempotencyKey: String,
+        message: String?,
+        code: String?,
+    ) {
+        history.upsert(
+            RestorationJobEntity(
+                remoteJobId = "failed_$idempotencyKey",
+                originalUri = photoUri.toString(),
+                mode = mode.wire,
+                output = output.wire,
+                status = "failed",
+                stage = "failed",
+                progress = 0,
+                createdAt = System.currentTimeMillis(),
+                errorCode = code,
+                errorMessage = message ?: "Upload failed",
+            ),
+        )
     }
 
     private fun errorData(message: String?, code: String?): Data =

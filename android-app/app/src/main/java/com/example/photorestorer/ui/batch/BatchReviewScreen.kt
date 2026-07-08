@@ -148,7 +148,14 @@ fun BatchReviewScreen(
                         if (state.mode == RestorationMode.RESTORE) {
                             val masked = state.maskedPhotos.contains(uri.toString())
                             TextButton(onClick = { onEditMask(index) }) {
-                                Text(if (masked) "Mask ✓" else "Mask")
+                                Text(
+                                    if (masked) "Mask ✓" else "Add mask",
+                                    color = if (masked) {
+                                        MaterialTheme.colorScheme.tertiary
+                                    } else {
+                                        MaterialTheme.colorScheme.primary
+                                    },
+                                )
                             }
                         }
                         TextButton(onClick = { viewModel.removePhoto(uri) }) { Text("Remove") }
