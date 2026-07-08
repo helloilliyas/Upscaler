@@ -1,0 +1,41 @@
+name: Modal Run
+
+# Runs a single function from modal_app.py on Modal (GPU included) and shows
+# its output in the Actions log. Debugging aid for a phone-only workflow.
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Function name (modal run modal_app.py::<target>)"
+        required: true
+        default: "diagnose"
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install Modal and backend deps
+        run: |
+          pip install modal
+          pip install -r requirements.txt
+
+      - name: Run function
+        env:
+          MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+          MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+        run: modal run "modal_app.py::${{ inputs.target }}"

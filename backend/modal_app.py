@@ -309,6 +309,76 @@ class SpawnProcessor:
         jobs.set_call_id(job_id, call.object_id)
 
 
+# --- Debugging helpers (run via `modal run modal_app.py::<name>`) ---------
+
+
+@app.function(image=web_image, volumes={DATA_MOUNT: files_volume})
+def diagnose() -> None:
+    """Print sanitized recent job records + whether each mask blob exists.
+
+    No image bytes, owner ids, or emails are printed — CI logs are public.
+    """
+    from app.storage import mask_path
+
+    files = ModalVolumeFileStore(DATA_MOUNT, files_volume)
+    files.reload()
+
+    records = [v for k, v in jobs_dict.items() if str(k).startswith("job:")]
+    records.sort(key=lambda r: r.get("created_at", ""), reverse=True)
+    print(f"{len(records)} job records present (completed+deleted ones may be gone)")
+    for r in records[:15]:
+        jid = str(r.get("job_id", "?"))
+        owner = str(r.get("owner_sub", ""))
+        mask_blob = files.exists(mask_path(owner, jid)) if owner else False
+        print(
+            f"{r.get('created_at')} {jid[:16]} mode={r.get('mode')} "
+            f"out={r.get('output')} status={r.get('status')} stage={r.get('stage')} "
+            f"prog={r.get('progress')} has_mask={r.get('has_mask')} "
+            f"mask_blob={mask_blob} strength={r.get('strength')} "
+            f"err={r.get('error_code')} msg={str(r.get('error_message'))[:200]}"
+        )
+
+
+@app.function(gpu="L4", image=standard_image, timeout=15 * 60)
+def selftest_lama() -> None:
+    """Run the deployed LaMa path on synthetic defects at increasing sizes.
+
+    Draws a red line 'defect', masks it, inpaints, and reports how much of the
+    defect survived plus peak VRAM — proving whether inpainting works and at
+    which resolution the L4 runs out of memory.
+    """
+    import numpy as np
+    import torch
+    from PIL import Image, ImageDraw
+
+    from app.pipelines.lama_inpaint import LamaInpainter
+
+    inpainter = LamaInpainter(MODELS_DIR).load()
+    for w, h in [(1024, 768), (1600, 1200), (2600, 1950), (4000, 3000)]:
+        img = Image.new("RGB", (w, h), (120, 160, 120))
+        ImageDraw.Draw(img).line((0, 0, w, h), fill=(255, 0, 0), width=max(8, w // 40))
+        mask = Image.new("L", (w, h), 0)
+        ImageDraw.Draw(mask).line((0, 0, w, h), fill=255, width=max(12, w // 30))
+
+        torch.cuda.empty_cache()
+        torch.cuda.reset_peak_memory_stats()
+        try:
+            out = inpainter.inpaint(img, mask)
+            a = np.asarray(img, dtype=np.int32)
+            b = np.asarray(out, dtype=np.int32)
+            m = np.asarray(mask) > 0
+            diff_in = float(np.abs(a - b)[m].mean())
+            diff_out = float(np.abs(a - b)[~m].mean())
+            red_left = int(((np.asarray(out)[..., 0] > 200) & m).sum())
+            peak = torch.cuda.max_memory_allocated() / 1e9
+            print(
+                f"{w}x{h}: OK diff_in_mask={diff_in:.1f} diff_outside={diff_out:.2f} "
+                f"defect_pixels_left={red_left} peak_vram={peak:.1f}GB"
+            )
+        except Exception as exc:  # keep probing the next size after a failure
+            print(f"{w}x{h}: FAILED {type(exc).__name__}: {str(exc)[:300]}")
+
+
 # --- Web app -------------------------------------------------------------
 
 
