@@ -33,19 +33,16 @@ jobs:
       - name: Install Modal
         run: pip install -r requirements.txt
 
-      - name: Ensure API key secret exists
-        # The app's API key is derived one-way (HMAC) from the Modal token
-        # secret, so no plaintext key lives in this public repo. Created only
-        # if missing; never overwritten, so rotating the Modal token later
-        # does not break the app.
+      - name: Set API key secret
+        # This key only guards the vectorizer endpoint and ships inside the
+        # released APK, so it is not confidential; keeping it literal here
+        # keeps app and backend in sync.
         env:
           MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
           MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+          API_KEY: cfa78ad463390ab1bc7c7df4a0f5197793ba8289bb5d177f13b587a4ad09a1a6
         run: |
-          API_KEY=$(printf 'vector-converter-api' | openssl dgst -sha256 -hmac "$MODAL_TOKEN_SECRET" | awk '{print $NF}')
-          modal secret create vector-converter-secret API_KEY="$API_KEY" \
-            && echo "secret created" \
-            || echo "secret already exists - keeping it"
+          modal secret create --force vector-converter-secret API_KEY="$API_KEY"
 
       - name: Deploy
         env:
@@ -61,9 +58,8 @@ jobs:
 
       - name: End-to-end conversion test
         env:
-          MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+          API_KEY: cfa78ad463390ab1bc7c7df4a0f5197793ba8289bb5d177f13b587a4ad09a1a6
         run: |
-          API_KEY=$(printf 'vector-converter-api' | openssl dgst -sha256 -hmac "$MODAL_TOKEN_SECRET" | awk '{print $NF}')
           python3 -c "
           from PIL import Image, ImageDraw
           img = Image.new('RGB', (400, 300), (200, 30, 40))
