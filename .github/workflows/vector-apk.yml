@@ -12,7 +12,7 @@ on:
       - ".github/workflows/vector-apk.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -48,3 +48,15 @@ jobs:
           path: vector-app/build/app/outputs/flutter-apk/app-release.apk
           retention-days: 30
           if-no-files-found: error
+
+      - name: Publish as release (stable download link)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp build/app/outputs/flutter-apk/app-release.apk Vectorizer.apk
+          gh release delete vectorizer-latest --cleanup-tag --yes || true
+          gh release create vectorizer-latest \
+            --title "Vectorizer APK (latest)" \
+            --notes "Auto-built from commit ${{ github.sha }}" \
+            --target ${{ github.sha }} \
+            Vectorizer.apk
