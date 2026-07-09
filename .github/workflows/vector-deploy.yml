@@ -58,3 +58,26 @@ jobs:
           sleep 3
           curl -fsS --retry 3 --retry-delay 5 \
             https://helloilliyas--vector-converter-api.modal.run/health
+
+      - name: End-to-end conversion test
+        env:
+          MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+        run: |
+          API_KEY=$(printf 'vector-converter-api' | openssl dgst -sha256 -hmac "$MODAL_TOKEN_SECRET" | awk '{print $NF}')
+          python3 -c "
+          from PIL import Image, ImageDraw
+          img = Image.new('RGB', (400, 300), (200, 30, 40))
+          d = ImageDraw.Draw(img)
+          d.ellipse((100, 60, 300, 240), fill=(255, 255, 255))
+          d.rectangle((170, 120, 230, 180), fill=(20, 110, 50))
+          img.save('/tmp/test.png')
+          "
+          RESP=$(curl -fsS -X POST -H "x-api-key: $API_KEY" \
+            -F file=@/tmp/test.png -F preset=logo -F detail=60 -F format=svg \
+            https://helloilliyas--vector-converter-api.modal.run/vectorize)
+          echo "$RESP" | python3 -c "
+          import json, sys
+          r = json.load(sys.stdin)
+          assert r['format'] == 'svg' and '<svg' in r['svg'], 'bad response'
+          print('OK:', r['width'], 'x', r['height'], '-', r['path_count'], 'paths in', r['duration_ms'], 'ms')
+          "
