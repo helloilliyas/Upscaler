@@ -12,6 +12,7 @@ app = modal.App("vector-converter")
 
 image = (
     modal.Image.debian_slim(python_version="3.12")
+    .apt_install("libcairo2")
     .pip_install(
         "fastapi[standard]==0.115.*",
         "python-multipart",
@@ -88,12 +89,15 @@ def api():
             "path_count": result["path_count"],
             "duration_ms": result["duration_ms"],
         }
-        if format == "svg":
-            body["svg"] = result["svg"]
-        elif format == "pdf":
-            body["data_base64"] = base64.b64encode(pipeline.to_pdf(result["svg"])).decode()
-        else:
-            body["data_base64"] = base64.b64encode(pipeline.to_png(result["svg"])).decode()
+        try:
+            if format == "svg":
+                body["svg"] = result["svg"]
+            elif format == "pdf":
+                body["data_base64"] = base64.b64encode(pipeline.to_pdf(result["svg"])).decode()
+            else:
+                body["data_base64"] = base64.b64encode(pipeline.to_png(result["svg"])).decode()
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(500, f"Export to {format} failed: {exc}") from exc
         return body
 
     return web
