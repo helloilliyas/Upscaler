@@ -1,0 +1,2 @@
+# Deploy-time deps: `modal deploy` imports modal_app.py on the runner.
+modal

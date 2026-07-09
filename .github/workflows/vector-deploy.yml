@@ -1,0 +1,60 @@
+name: Deploy Vector Converter Backend
+
+# Deploys the vector-backend/ Modal app (separate from the Upscaler backend)
+# using the same MODAL_TOKEN_ID / MODAL_TOKEN_SECRET repo secrets.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, "claude/**"]
+    paths:
+      - "vector-backend/**"
+      - ".github/workflows/vector-deploy.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: vector-backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install Modal
+        run: pip install -r requirements.txt
+
+      - name: Ensure API key secret exists
+        # The app's API key is derived one-way (HMAC) from the Modal token
+        # secret, so no plaintext key lives in this public repo. Created only
+        # if missing; never overwritten, so rotating the Modal token later
+        # does not break the app.
+        env:
+          MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+          MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+        run: |
+          API_KEY=$(printf 'vector-converter-api' | openssl dgst -sha256 -hmac "$MODAL_TOKEN_SECRET" | awk '{print $NF}')
+          modal secret create vector-converter-secret API_KEY="$API_KEY" \
+            && echo "secret created" \
+            || echo "secret already exists - keeping it"
+
+      - name: Deploy
+        env:
+          MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+          MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+        run: modal deploy modal_app.py
+
+      - name: Smoke test
+        run: |
+          sleep 3
+          curl -fsS --retry 3 --retry-delay 5 \
+            https://helloilliyas--vector-converter-api.modal.run/health
