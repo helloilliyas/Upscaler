@@ -11,7 +11,7 @@ import time
 import cv2
 import numpy as np
 import pillow_heif
-from PIL import Image, ImageOps
+from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 
 pillow_heif.register_heif_opener()
 
@@ -26,6 +26,7 @@ PRESETS = {
         "denoise": True,
         "contrast": False,
         "binary": False,
+        "crisp": False,
         "vtracer": dict(colormode="color", hierarchical="stacked", mode="spline",
                         color_precision=8, layer_difference=16,
                         corner_threshold=60, splice_threshold=45),
@@ -33,21 +34,23 @@ PRESETS = {
     "poster": {
         "description": "Flat poster art - reduced palette, bold shapes",
         "quantize": 8,
-        "denoise": True,
-        "contrast": True,
+        "denoise": False,
+        "contrast": False,
         "binary": False,
+        "crisp": True,
         "vtracer": dict(colormode="color", hierarchical="stacked", mode="spline",
                         color_precision=6, layer_difference=28,
                         corner_threshold=60, splice_threshold=45),
     },
     "logo": {
         "description": "Logos & graphics - few colors, crisp edges",
-        "quantize": 6,
+        "quantize": 8,
         "denoise": False,
         "contrast": False,
         "binary": False,
+        "crisp": True,
         "vtracer": dict(colormode="color", hierarchical="stacked", mode="spline",
-                        color_precision=5, layer_difference=32,
+                        color_precision=6, layer_difference=28,
                         corner_threshold=45, splice_threshold=45),
     },
     "sketch": {
@@ -56,6 +59,7 @@ PRESETS = {
         "denoise": False,
         "contrast": False,
         "binary": True,
+        "crisp": True,
         "vtracer": dict(colormode="binary", hierarchical="stacked", mode="spline",
                         corner_threshold=60, splice_threshold=45),
     },
@@ -77,7 +81,30 @@ def _load_and_resize(data: bytes) -> Image.Image:
     return img
 
 
+CRISP_MIN_SIDE = 1400
+
+
+def _crisp(img: Image.Image) -> Image.Image:
+    """Edge-sharpening stage for logo/poster/sketch: upscale small inputs,
+    flatten noise while keeping edges, boost local contrast, mild unsharp.
+    Traced edges can only be as sharp as the raster ones, so this runs
+    before quantization/tracing."""
+    if max(img.size) < CRISP_MIN_SIDE:
+        f = CRISP_MIN_SIDE / max(img.size)
+        img = img.resize((round(img.width * f), round(img.height * f)), Image.LANCZOS)
+    arr = cv2.cvtColor(np.asarray(img), cv2.COLOR_RGB2BGR)
+    arr = cv2.bilateralFilter(arr, d=9, sigmaColor=55, sigmaSpace=55)
+    lab = cv2.cvtColor(arr, cv2.COLOR_BGR2LAB)
+    lab[:, :, 0] = cv2.createCLAHE(clipLimit=1.6, tileGridSize=(8, 8)).apply(lab[:, :, 0])
+    arr = cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
+    img = Image.fromarray(cv2.cvtColor(arr, cv2.COLOR_BGR2RGB))
+    img = img.filter(ImageFilter.UnsharpMask(radius=2, percent=120, threshold=3))
+    return ImageEnhance.Color(img).enhance(1.25)
+
+
 def _preprocess(img: Image.Image, preset: dict, colors: int) -> Image.Image:
+    if preset.get("crisp"):
+        img = _crisp(img)
     arr = cv2.cvtColor(np.asarray(img), cv2.COLOR_RGB2BGR)
 
     if preset["denoise"]:
@@ -125,6 +152,8 @@ def vectorize(data: bytes, preset_name: str = "photo", colors: int = 0,
 
     params = dict(preset["vtracer"])
     params.update(_detail_params(detail))
+    if preset.get("crisp"):
+        params["filter_speckle"] = min(16, params["filter_speckle"] + 4)
 
     with tempfile.TemporaryDirectory() as tmp:
         src = os.path.join(tmp, "in.png")
