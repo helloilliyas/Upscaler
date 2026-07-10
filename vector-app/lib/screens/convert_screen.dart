@@ -29,6 +29,7 @@ class _ConvertScreenState extends State<ConvertScreen> {
   bool _customColors = false;
   double _detail = 60;
   String _format = 'svg';
+  bool _enhance = false;
 
   bool _busy = false;
   double? _uploadProgress;
@@ -45,6 +46,7 @@ class _ConvertScreenState extends State<ConvertScreen> {
         colors: _customColors && _preset != 'sketch' ? _colors.round() : 0,
         detail: _detail.round(),
         format: _format,
+        enhance: _enhance,
         onUploadProgress: (p) => setState(() => _uploadProgress = p),
       );
       final entry = await HistoryStore.add(
@@ -148,6 +150,15 @@ class _ConvertScreenState extends State<ConvertScreen> {
                 ],
               ),
           ],
+          const SizedBox(height: 8),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('AI enhance (GPU)'),
+            subtitle: const Text(
+                'Real-ESRGAN 4\u00d7 upscale before tracing \u2014 best for small or blurry images. Adds ~20\u201360 s.'),
+            value: _enhance,
+            onChanged: _busy ? null : (v) => setState(() => _enhance = v),
+          ),
           const SizedBox(height: 8),
           Text('Output', style: Theme.of(context).textTheme.titleSmall),
           const SizedBox(height: 8),

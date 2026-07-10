@@ -31,7 +31,7 @@ class VectorApi {
     baseUrl: Config.backendUrl,
     headers: {'x-api-key': Config.apiKey},
     connectTimeout: const Duration(seconds: 20),
-    receiveTimeout: const Duration(minutes: 3),
+    receiveTimeout: const Duration(minutes: 6),
     sendTimeout: const Duration(minutes: 2),
   ));
 
@@ -41,6 +41,7 @@ class VectorApi {
     required int colors,
     required int detail,
     required String format,
+    bool enhance = false,
     void Function(double progress)? onUploadProgress,
   }) async {
     final form = FormData.fromMap({
@@ -48,6 +49,7 @@ class VectorApi {
       'colors': colors,
       'detail': detail,
       'format': format,
+      'enhance': enhance ? 1 : 0,
       'file': await MultipartFile.fromFile(image.path,
           filename: image.uri.pathSegments.last),
     });

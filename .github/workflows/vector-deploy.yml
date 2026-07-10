@@ -77,6 +77,10 @@ jobs:
           assert r['format'] == 'svg' and '<svg' in r['svg'], 'bad response'
           print('OK:', r['width'], 'x', r['height'], '-', r['path_count'], 'paths in', r['duration_ms'], 'ms')
           "
+          curl -fsS --max-time 300 -X POST -H "x-api-key: $API_KEY" \
+            -F file=@/tmp/test.png -F preset=logo -F detail=60 -F format=svg -F enhance=1 \
+            https://helloilliyas--vector-converter-api.modal.run/vectorize \
+            | python3 -c "import json,sys; r=json.load(sys.stdin); assert r['enhanced'] and '<svg' in r['svg']; print('OK enhanced:', r['width'], 'x', r['height'], '-', r['path_count'], 'paths')"
           for FMT in pdf png; do
             curl -fsS -X POST -H "x-api-key: $API_KEY" \
               -F file=@/tmp/test.png -F preset=logo -F detail=60 -F format=$FMT \
