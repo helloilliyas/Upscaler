@@ -102,8 +102,10 @@ image = (
         "opencv-python-headless",
         "numpy",
         "cairosvg",
+        "anthropic",
     )
     .add_local_python_source("pipeline")
+    .add_local_python_source("refine")
 )
 
 MAX_UPLOAD = 10 * 1024 * 1024  # 10 MB
@@ -112,7 +114,7 @@ MAX_UPLOAD = 10 * 1024 * 1024  # 10 MB
 @app.function(
     image=image,
     secrets=[modal.Secret.from_name("vector-converter-secret")],
-    timeout=180,
+    timeout=300,
     max_containers=3,
 )
 @modal.concurrent(max_inputs=4)
@@ -124,6 +126,7 @@ def api():
     from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 
     import pipeline
+    import refine as refine_mod
 
     web = FastAPI(title="Vector Converter", docs_url=None, redoc_url=None)
     api_key = os.environ["API_KEY"]
@@ -187,5 +190,28 @@ def api():
         except Exception as exc:  # noqa: BLE001
             raise HTTPException(500, f"Export to {format} failed: {exc}") from exc
         return body
+
+    @web.post("/refine")
+    async def refine(
+        file: UploadFile = File(...),
+        preset: str = Form("photo"),
+        colors: int = Form(0),
+        detail: int = Form(60),
+        anthropic_key: str = Form(""),
+        x_api_key: str | None = Header(None),
+    ):
+        check(x_api_key)
+        if preset not in pipeline.PRESETS:
+            raise HTTPException(422, f"Unknown preset '{preset}'")
+        data = await file.read()
+        if len(data) > MAX_UPLOAD:
+            raise HTTPException(413, "File larger than 10 MB")
+        if not data:
+            raise HTTPException(422, "Empty file")
+        try:
+            return refine_mod.refine(data, preset, colors, detail,
+                                     anthropic_key or None)
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(500, f"Refine failed: {exc}") from exc
 
     return web

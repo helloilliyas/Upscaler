@@ -4,13 +4,62 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import '../api_client.dart';
 import '../history.dart';
 import '../widgets/before_after.dart';
+import 'settings_screen.dart';
 
-class ResultScreen extends StatelessWidget {
+class ResultScreen extends StatefulWidget {
   final HistoryEntry entry;
   const ResultScreen({super.key, required this.entry});
+
+  @override
+  State<ResultScreen> createState() => _ResultScreenState();
+}
+
+class _ResultScreenState extends State<ResultScreen> {
+  HistoryEntry get entry => widget.entry;
+  bool _refining = false;
+
+  Future<void> _refine() async {
+    setState(() => _refining = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = prefs.getString(kAnthropicKeyPref);
+      final result = await VectorApi().refine(
+        File(entry.inputPath),
+        preset: entry.preset.replaceAll(' +AI', ''),
+        anthropicKey: key,
+      );
+      final refined = await HistoryStore.add(
+        input: File(entry.inputPath),
+        output: result.svgBytes,
+        preset: '${entry.preset.replaceAll(' +AI', '')} +AI',
+        format: 'svg',
+        pathCount: result.pathCount,
+      );
+      if (!mounted) return;
+      await Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => ResultScreen(entry: refined)));
+      messenger.showSnackBar(SnackBar(
+        content: Text(result.aiNotes == null || result.aiNotes!.isEmpty
+            ? 'Refined (score ${result.scoreBaseline.toStringAsFixed(1)} \u2192 ${result.scoreFinal.toStringAsFixed(1)})'
+            : 'AI: ${result.aiNotes}'),
+        duration: const Duration(seconds: 6),
+        behavior: SnackBarBehavior.floating,
+      ));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(
+        content: Text(e.toString()),
+        behavior: SnackBarBehavior.floating,
+      ));
+    } finally {
+      if (mounted) setState(() => _refining = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -56,6 +105,21 @@ class ResultScreen extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
             child: Row(
               children: [
+                if (entry.format == 'svg') ...[
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      icon: _refining
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Icon(Icons.auto_awesome),
+                      label: Text(_refining ? 'Refining\u2026' : 'Refine with AI'),
+                      onPressed: _refining ? null : _refine,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                ],
                 Expanded(
                   child: FilledButton.icon(
                     icon: const Icon(Icons.share),

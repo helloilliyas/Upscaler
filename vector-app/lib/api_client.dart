@@ -26,6 +26,24 @@ class VectorResult {
   String get svgText => utf8.decode(bytes);
 }
 
+class RefineResult {
+  final Uint8List svgBytes;
+  final int pathCount;
+  final String? aiNotes;
+  final int aiEditsApplied;
+  final double scoreBaseline;
+  final double scoreFinal;
+
+  RefineResult({
+    required this.svgBytes,
+    required this.pathCount,
+    required this.aiNotes,
+    required this.aiEditsApplied,
+    required this.scoreBaseline,
+    required this.scoreFinal,
+  });
+}
+
 class VectorApi {
   final Dio _dio = Dio(BaseOptions(
     baseUrl: Config.backendUrl,
@@ -81,6 +99,41 @@ class VectorApi {
       height: data['height'] as int,
       pathCount: data['path_count'] as int,
       durationMs: data['duration_ms'] as int,
+    );
+  }
+
+  Future<RefineResult> refine(
+    File image, {
+    required String preset,
+    String? anthropicKey,
+  }) async {
+    final form = FormData.fromMap({
+      'preset': preset,
+      'colors': 0,
+      'detail': 60,
+      'anthropic_key': anthropicKey ?? '',
+      'file': await MultipartFile.fromFile(image.path,
+          filename: image.uri.pathSegments.last),
+    });
+
+    final Response res;
+    try {
+      res = await _dio.post('/refine', data: form);
+    } on DioException catch (e) {
+      final detailMsg = e.response?.data is Map
+          ? (e.response!.data['detail']?.toString() ?? e.message)
+          : e.message;
+      throw Exception('Refine failed: $detailMsg');
+    }
+
+    final data = res.data as Map<String, dynamic>;
+    return RefineResult(
+      svgBytes: Uint8List.fromList(utf8.encode(data['svg'] as String)),
+      pathCount: data['path_count'] as int,
+      aiNotes: data['ai_notes'] as String?,
+      aiEditsApplied: (data['ai_edits_applied'] ?? 0) as int,
+      scoreBaseline: (data['score_baseline'] as num).toDouble(),
+      scoreFinal: (data['score_final'] as num).toDouble(),
     );
   }
 }

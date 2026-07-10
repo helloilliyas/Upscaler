@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 
 import 'history.dart';
 import 'screens/convert_screen.dart';
+import 'screens/settings_screen.dart';
 import 'screens/result_screen.dart';
 
 void main() => runApp(const VectorApp());
@@ -68,7 +69,17 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Vectorizer')),
+      appBar: AppBar(
+        title: const Text('Vectorizer'),
+        actions: [
+          IconButton(
+            tooltip: 'Settings',
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const SettingsScreen())),
+          ),
+        ],
+      ),
       body: _history.isEmpty ? _empty(context) : _grid(),
       floatingActionButton: Column(
         mainAxisSize: MainAxisSize.min,

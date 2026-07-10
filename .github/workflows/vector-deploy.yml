@@ -81,6 +81,10 @@ jobs:
             -F file=@/tmp/test.png -F preset=logo -F detail=60 -F format=svg -F enhance=1 \
             https://helloilliyas--vector-converter-api.modal.run/vectorize \
             | python3 -c "import json,sys; r=json.load(sys.stdin); assert r['enhanced'] and '<svg' in r['svg']; print('OK enhanced:', r['width'], 'x', r['height'], '-', r['path_count'], 'paths')"
+          curl -fsS --max-time 300 -X POST -H "x-api-key: $API_KEY" \
+            -F file=@/tmp/test.png -F preset=logo \
+            https://helloilliyas--vector-converter-api.modal.run/refine \
+            | python3 -c "import json,sys; r=json.load(sys.stdin); assert '<svg' in r['svg']; print('OK refined:', r['chosen'], 'score', r['score_baseline'], '->', r['score_final'])"
           for FMT in pdf png; do
             curl -fsS -X POST -H "x-api-key: $API_KEY" \
               -F file=@/tmp/test.png -F preset=logo -F detail=60 -F format=$FMT \
