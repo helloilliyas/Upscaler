@@ -1,8 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
-import 'package:file_saver/file_saver.dart';
+import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
 class HistoryEntry {
@@ -13,6 +12,7 @@ class HistoryEntry {
   final String inputPath;
   final String outputPath;
   final int pathCount;
+  final String? downloadsName; // null = Downloads copy failed/unavailable
 
   HistoryEntry({
     required this.id,
@@ -22,6 +22,7 @@ class HistoryEntry {
     required this.inputPath,
     required this.outputPath,
     required this.pathCount,
+    this.downloadsName,
   });
 
   Map<String, dynamic> toJson() => {
@@ -32,6 +33,7 @@ class HistoryEntry {
         'inputPath': inputPath,
         'outputPath': outputPath,
         'pathCount': pathCount,
+        'downloadsName': downloadsName,
       };
 
   static HistoryEntry fromJson(Map<String, dynamic> j) => HistoryEntry(
@@ -42,10 +44,13 @@ class HistoryEntry {
         inputPath: j['inputPath'],
         outputPath: j['outputPath'],
         pathCount: j['pathCount'] ?? 0,
+        downloadsName: j['downloadsName'],
       );
 }
 
 class HistoryStore {
+  static const _downloadsChannel = MethodChannel('vectorizer/downloads');
+
   static Future<Directory> _dir() async {
     final docs = await getApplicationDocumentsDirectory();
     final dir = Directory('${docs.path}/vectorizer');
@@ -93,20 +98,23 @@ class HistoryStore {
     final outFile = File('${dir.path}/$id.$format');
     await outFile.writeAsBytes(output);
 
-    // Also drop a visible copy into the phone's Downloads folder.
-    // Best-effort: a failure here must not fail the conversion.
+    // Also drop a visible copy into the phone's Downloads folder via the
+    // native MediaStore channel. Best-effort: a failure must not fail the
+    // conversion, but it is recorded so the UI never claims a save that
+    // didn't happen.
+    String? downloadsName;
     try {
-      await FileSaver.instance.saveFile(
-        name: 'vectorizer_$id',
-        bytes: output,
-        ext: format,
-        mimeType: switch (format) {
-          'pdf' => MimeType.pdf,
-          'png' => MimeType.png,
-          _ => MimeType.custom,
+      final name = 'vectorizer_$id.$format';
+      await _downloadsChannel.invokeMethod('save', {
+        'name': name,
+        'mime': switch (format) {
+          'pdf' => 'application/pdf',
+          'png' => 'image/png',
+          _ => 'image/svg+xml',
         },
-        customMimeType: format == 'svg' ? 'image/svg+xml' : null,
-      );
+        'bytes': output,
+      });
+      downloadsName = name;
     } catch (_) {}
 
     final entry = HistoryEntry(
@@ -117,6 +125,7 @@ class HistoryStore {
       inputPath: inputCopy.path,
       outputPath: outFile.path,
       pathCount: pathCount,
+      downloadsName: downloadsName,
     );
     final entries = await load();
     entries.insert(0, entry);
