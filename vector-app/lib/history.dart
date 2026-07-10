@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:file_saver/file_saver.dart';
 import 'package:path_provider/path_provider.dart';
 
 class HistoryEntry {
@@ -91,6 +92,22 @@ class HistoryStore {
     await input.copy(inputCopy.path);
     final outFile = File('${dir.path}/$id.$format');
     await outFile.writeAsBytes(output);
+
+    // Also drop a visible copy into the phone's Downloads folder.
+    // Best-effort: a failure here must not fail the conversion.
+    try {
+      await FileSaver.instance.saveFile(
+        name: 'vectorizer_$id',
+        bytes: output,
+        ext: format,
+        mimeType: switch (format) {
+          'pdf' => MimeType.pdf,
+          'png' => MimeType.png,
+          _ => MimeType.custom,
+        },
+        customMimeType: format == 'svg' ? 'image/svg+xml' : null,
+      );
+    } catch (_) {}
 
     final entry = HistoryEntry(
       id: id,

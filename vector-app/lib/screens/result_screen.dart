@@ -47,7 +47,7 @@ class ResultScreen extends StatelessWidget {
             child: Text(
               '${entry.pathCount} paths · '
               '${DateFormat('d MMM y, HH:mm').format(entry.date)}\n'
-              'Saved: ${entry.outputPath}',
+              'In Downloads as vectorizer_${entry.id}.${entry.format}',
               style: Theme.of(context).textTheme.bodySmall,
               textAlign: TextAlign.center,
             ),
