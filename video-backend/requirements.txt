@@ -1,0 +1,12 @@
+# Runtime dependencies for the FastAPI web layer (no GPU / model libraries
+# here; those live in the Modal worker image). ffmpeg/ffprobe are system
+# binaries, installed via apt in the images and CI.
+fastapi>=0.111
+uvicorn[standard]>=0.30
+python-multipart>=0.0.9
+pydantic>=2.7
+pydantic-settings>=2.3
+google-auth>=2.30
+# Transport backend for google.auth (google.auth.transport.requests) — required
+# for Google ID-token verification; not pulled in by google-auth itself.
+requests>=2.31

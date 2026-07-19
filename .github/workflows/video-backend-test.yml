@@ -1,0 +1,50 @@
+name: Video Backend Tests
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "video-backend/**"
+      - ".github/workflows/video-backend-test.yml"
+  push:
+    branches: [main, "claude/**"]
+    paths:
+      - "video-backend/**"
+      - ".github/workflows/video-backend-test.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: video-backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: video-backend/requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Lint (ruff)
+        run: ruff check .
+
+      - name: Type check (mypy)
+        run: mypy app
+
+      - name: Unit tests (pytest)
+        run: python -m pytest -q
