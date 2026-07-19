@@ -1,0 +1,63 @@
+name: Video Android CI
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "video-android-app/**"
+      - ".github/workflows/video-android-ci.yml"
+  push:
+    branches: [main, "claude/**"]
+    paths:
+      - "video-android-app/**"
+      - ".github/workflows/video-android-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    # Non-secret build config. Set these as repository Variables
+    # (Settings → Secrets and variables → Actions → Variables). When unset they
+    # fall back to the defaults in gradle.properties / app/build.gradle.kts.
+    env:
+      VIDEO_BASE_URL: ${{ vars.VIDEO_BASE_URL }}
+      GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID }}
+
+    defaults:
+      run:
+        working-directory: video-android-app
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
+
+      - name: Run unit tests
+        run: ./gradlew testDebugUnitTest
+
+      - name: Run lint
+        run: ./gradlew lintDebug
+
+      - name: Build debug APK
+        run: ./gradlew assembleDebug
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: video-upscaler-debug
+          path: video-android-app/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
