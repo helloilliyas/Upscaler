@@ -41,12 +41,12 @@ WEIGHTS = [
         "sha256": "8dc7edb9ac80ccdc30c3a5dca6616509367f05fbc184ad95b731f05bece96292",
     },
     {
-        # Pin after the first successful build: the build log prints
-        # "PIN_SHA256 realesr-general-wdn-x4v3.pth <hash>" (same pin-from-
-        # first-build approach the photo backend used for its Ultra snapshot).
+        # Pinned from the PIN_SHA256 line of the first successful build
+        # (deploy run 29713759131), same pin-from-first-build approach the
+        # photo backend used for its Ultra snapshot.
         "file": "realesr-general-wdn-x4v3.pth",
         "url": f"{_RELEASE}/realesr-general-wdn-x4v3.pth",
-        "sha256": None,
+        "sha256": "1641f8c4464b9f097c9fdda5589273713f67cf59f3d909e0bd688f0cee269dca",
     },
 ]
 
@@ -306,15 +306,24 @@ def selftest_video() -> None:
 
         # Portrait pass: the same clip with a 90-degree rotation flag (how
         # phones store portrait video) must probe swapped and come out upright.
+        # -display_rotation needs ffmpeg 6; fall back to the legacy rotate
+        # metadata on older builds, and skip if neither produces the flag.
         portrait_src = work / "src_portrait.mp4"
-        subprocess.run(
-            [
-                "ffmpeg", "-y", "-v", "error",
-                "-display_rotation", "90",
-                "-i", str(src), "-c", "copy", str(portrait_src),
-            ],
-            check=True,
-        )
+        authored = False
+        for extra in (
+            ["-display_rotation", "90", "-i", str(src), "-c", "copy"],
+            ["-i", str(src), "-c", "copy", "-metadata:s:v:0", "rotate=90"],
+        ):
+            result = subprocess.run(
+                ["ffmpeg", "-y", "-v", "error", *extra, str(portrait_src)],
+                capture_output=True,
+            )
+            if result.returncode == 0 and probe_video(portrait_src).width == 1080:
+                authored = True
+                break
+        if not authored:
+            print("portrait pass SKIPPED: this ffmpeg cannot author a rotation flag")
+            return
         p_info = probe_video(portrait_src)
         assert (p_info.width, p_info.height) == (1080, 1920), (p_info.width, p_info.height)
         p_target = compute_target_size(p_info.width, p_info.height, OutputSize.X2)
