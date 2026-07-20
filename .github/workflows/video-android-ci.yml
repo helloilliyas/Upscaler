@@ -61,3 +61,31 @@ jobs:
           name: video-upscaler-debug
           path: video-android-app/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+
+  # Artifacts expire after 90 days; the release copy is permanent. One rolling
+  # "video-upscaler-latest" release always carries the newest APK.
+  release:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: video-upscaler-debug
+          path: apk
+
+      - name: Publish rolling release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete video-upscaler-latest --yes --cleanup-tag \
+            --repo "$GITHUB_REPOSITORY" || true
+          gh release create video-upscaler-latest apk/*.apk \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "Video Upscaler APK (latest)" \
+            --notes "Debug APK for the standalone Video Upscaler app, built from $GITHUB_SHA. Install on-device; results are saved to Movies/VideoUpscaler in the Gallery."
