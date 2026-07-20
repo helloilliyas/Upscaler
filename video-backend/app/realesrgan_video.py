@@ -27,14 +27,27 @@ from .worker import audio_args
 
 _SCALE = 4
 _MODEL_FILE = "realesr-general-x4v3.pth"
+# The weak-denoise twin; blended with the main model to control smoothing.
+_WDN_MODEL_FILE = "realesr-general-wdn-x4v3.pth"
+# Mild output sharpening (ffmpeg unsharp luma amount) to counter resampling.
+_SHARPEN = 0.3
 
 
 class RealEsrganVideoEnhancer:
     """Streams frames through the compact Real-ESRGAN x4 model."""
 
-    def __init__(self, weights_dir: str, *, half: bool = True) -> None:
+    def __init__(
+        self, weights_dir: str, *, half: bool = True, denoise: float = 0.35
+    ) -> None:
+        """``denoise`` in [0, 1]: 1.0 = pure strong-denoise model (very smooth),
+        0.0 = pure weak-denoise model (keeps grain and fine texture). The
+        weights of the two models are linearly blended, exactly like the
+        official Real-ESRGAN ``--denoise_strength`` option.
+        """
         self._weights = Path(weights_dir) / _MODEL_FILE
+        self._wdn_weights = Path(weights_dir) / _WDN_MODEL_FILE
         self._half = half
+        self._denoise = min(1.0, max(0.0, denoise))
         self._model: Any = None
         self._torch: Any = None
 
@@ -50,8 +63,19 @@ class RealEsrganVideoEnhancer:
             upscale=_SCALE,
             act_type="prelu",
         )
-        state = torch.load(str(self._weights), map_location="cpu")
-        model.load_state_dict(state.get("params", state), strict=True)
+
+        def params(path: Path) -> Any:
+            state = torch.load(str(path), map_location="cpu")
+            return state.get("params", state)
+
+        state = params(self._weights)
+        if self._denoise < 1.0 and self._wdn_weights.exists():
+            wdn = params(self._wdn_weights)
+            state = {
+                key: self._denoise * value + (1.0 - self._denoise) * wdn[key]
+                for key, value in state.items()
+            }
+        model.load_state_dict(state, strict=True)
         model.eval()
         model = model.cuda().half() if self._half else model.cuda()
         self._model = model
@@ -109,9 +133,9 @@ class RealEsrganVideoEnhancer:
             "pipe:1",
         ]
         if vcodec == "hevc_nvenc":
-            codec_args = ["-c:v", "hevc_nvenc", "-preset", "p5", "-cq", "23", "-tag:v", "hvc1"]
+            codec_args = ["-c:v", "hevc_nvenc", "-preset", "p5", "-cq", "20", "-tag:v", "hvc1"]
         else:
-            codec_args = ["-c:v", "libx264", "-preset", "fast", "-crf", "18"]
+            codec_args = ["-c:v", "libx264", "-preset", "fast", "-crf", "17"]
         # Frames are resized to the final target on the GPU before piping, so
         # the encoder receives target-sized frames (4x less pipe traffic than
         # piping the raw 4x model output) and never scales on the CPU.
@@ -123,6 +147,7 @@ class RealEsrganVideoEnhancer:
             "-i", str(src),
             "-map", "0:v:0",
             *(["-map", "1:a:0"] if info.has_audio else []),
+            "-vf", f"unsharp=5:5:{_SHARPEN}:5:5:0",
             "-pix_fmt", "yuv420p",
             *codec_args,
             *audio_args(info),

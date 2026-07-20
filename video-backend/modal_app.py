@@ -29,28 +29,52 @@ from app.storage import FileStore, MetadataStore
 DATA_MOUNT = "/data"
 MODELS_DIR = "/models"
 
-# Compact Real-ESRGAN checkpoint, pinned by SHA-256 and baked into the GPU
-# image at build. ~5 MB; the SRVGGNetCompact architecture is what makes
-# per-frame video work affordable.
-WEIGHT_URL = (
-    "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/"
-    "realesr-general-x4v3.pth"
-)
-WEIGHT_SHA256 = "8dc7edb9ac80ccdc30c3a5dca6616509367f05fbc184ad95b731f05bece96292"
+# Compact Real-ESRGAN checkpoints, baked into the GPU image at build. ~5 MB
+# each; the SRVGGNetCompact architecture is what makes per-frame video work
+# affordable. The main model and its weak-denoise (wdn) twin are blended at
+# load time to control smoothing (see realesrgan_video.py).
+_RELEASE = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0"
+WEIGHTS = [
+    {
+        "file": "realesr-general-x4v3.pth",
+        "url": f"{_RELEASE}/realesr-general-x4v3.pth",
+        "sha256": "8dc7edb9ac80ccdc30c3a5dca6616509367f05fbc184ad95b731f05bece96292",
+    },
+    {
+        # Pin after the first successful build: the build log prints
+        # "PIN_SHA256 realesr-general-wdn-x4v3.pth <hash>" (same pin-from-
+        # first-build approach the photo backend used for its Ultra snapshot).
+        "file": "realesr-general-wdn-x4v3.pth",
+        "url": f"{_RELEASE}/realesr-general-wdn-x4v3.pth",
+        "sha256": None,
+    },
+]
 
 app = modal.App("ai-video-upscaler")
 
 files_volume = modal.Volume.from_name("video-upscaler-files", create_if_missing=True)
 jobs_dict = modal.Dict.from_name("video-upscaler-jobs", create_if_missing=True)
 
-_WEIGHT_CMD = (
-    f"mkdir -p {MODELS_DIR} && python -c \""
-    "import urllib.request, hashlib; "
-    f"p = '{MODELS_DIR}/realesr-general-x4v3.pth'; "
-    f"urllib.request.urlretrieve('{WEIGHT_URL}', p); "
-    "h = hashlib.sha256(open(p, 'rb').read()).hexdigest(); "
-    f"assert h == '{WEIGHT_SHA256}', h\""
-)
+
+def _weight_download_commands() -> list[str]:
+    """Fetch each weight at build; verify the pinned hash or print it to pin."""
+    cmds = [f"mkdir -p {MODELS_DIR}"]
+    for w in WEIGHTS:
+        path = f"{MODELS_DIR}/{w['file']}"
+        script = (
+            "import urllib.request, hashlib, os; "
+            f"p = {path!r}; "
+            f"urllib.request.urlretrieve({w['url']!r}, p); "
+            "h = hashlib.sha256(open(p, 'rb').read()).hexdigest(); "
+            # Sanity floor so an HTML error page can never pass as weights.
+            "assert os.path.getsize(p) > 1_000_000, os.path.getsize(p); "
+        )
+        if w["sha256"]:
+            script += f"assert h == {w['sha256']!r}, h"
+        else:
+            script += f"print('PIN_SHA256', {w['file']!r}, h)"
+        cmds.append(f'python -c "{script}"')
+    return cmds
 
 # Lightweight image for the web layer: no torch, but ffmpeg for ffprobe
 # validation of uploads.
@@ -97,7 +121,7 @@ gpu_image = (
         "basicsr==1.4.2",
         extra_options="--no-build-isolation",
     )
-    .run_commands(_WEIGHT_CMD)
+    .run_commands(*_weight_download_commands())
     .add_local_python_source("app")
 )
 
@@ -175,7 +199,8 @@ class VideoUpscaler:
         self._files = ModalVolumeFileStore(DATA_MOUNT, files_volume)
         self._jobs = JobService(ModalDictMetadataStore(jobs_dict), self._files)
         # fp16 is safe on the L4; the compact model needs no tiling at 1080p.
-        self._enhancer = RealEsrganVideoEnhancer(MODELS_DIR, half=True)
+        # denoise=0.35 keeps fine texture (1.0 = maximum smoothing).
+        self._enhancer = RealEsrganVideoEnhancer(MODELS_DIR, half=True, denoise=0.35)
         self._enhancer.load()
         self._enhancer.warmup()
 
@@ -260,7 +285,7 @@ def selftest_video() -> None:
         print(f"source: {info.width}x{info.height}@{info.fps:.2f} "
               f"{info.frames_estimate} frames; target: {target}")
 
-        enhancer = RealEsrganVideoEnhancer(MODELS_DIR, half=True).load()
+        enhancer = RealEsrganVideoEnhancer(MODELS_DIR, half=True, denoise=0.35).load()
         dst = work / "out.mp4"
         seen = {"n": 0}
 
