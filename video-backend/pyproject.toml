@@ -1,0 +1,30 @@
+[project]
+name = "ai-video-upscaler-backend"
+version = "1.0.0"
+description = "FastAPI + Modal backend for the AI Video Upscaler"
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["app", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP", "B"]
+ignore = [
+    "B008",   # FastAPI uses callables in argument defaults (Form/Header/Depends)
+    "UP042",  # `str`+`Enum` is intentional for JSON-friendly, comparable enums
+    "UP017",  # keep timezone.utc (not datetime.UTC) so the deploy client runs on 3.10
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+warn_unused_ignores = false
+check_untyped_defs = true
+# modal_app.py imports the optional `modal` package; skip it in CI type checks.
+exclude = ["modal_app.py"]

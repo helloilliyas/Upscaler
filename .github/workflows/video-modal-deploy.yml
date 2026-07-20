@@ -1,0 +1,53 @@
+name: Deploy Video Modal Backend
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_selftest:
+        description: "Run the GPU selftest_video after deploying"
+        type: boolean
+        default: false
+  push:
+    branches: [main, "claude/**"]
+    paths:
+      - "video-backend/**"
+      - ".github/workflows/video-modal-deploy.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: video-backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install Modal and backend deps
+        # modal deploy imports the backend code locally to build the deployment
+        # graph, so the runtime deps (pydantic, fastapi, ...) must be present.
+        run: |
+          pip install modal
+          pip install -r requirements.txt
+
+      - name: Deploy
+        env:
+          MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+          MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+        run: modal deploy modal_app.py
+
+      - name: GPU selftest (streams a synthetic 1080p clip through the pipeline)
+        if: ${{ inputs.run_selftest }}
+        env:
+          MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+          MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+        run: modal run modal_app.py::selftest_video

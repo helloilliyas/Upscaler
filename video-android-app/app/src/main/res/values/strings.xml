@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Video Upscaler</string>
+    <string name="continue_with_google">Continue with Google</string>
+    <string name="select_video">Select video</string>
+    <string name="sign_out">Sign out</string>
+    <string name="notification_channel_name">Video processing</string>
+    <string name="notification_title">Upscaling video</string>
+</resources>

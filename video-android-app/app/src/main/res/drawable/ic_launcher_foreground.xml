@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Adaptive-icon foreground: a rounded play glyph with an up-scaling arrow.
+     Content stays inside the 66dp safe zone of the 108dp viewport. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Play triangle (rounded corners via a wide round-joined stroke). -->
+    <path
+        android:pathData="M46,43 L46,65 L65,54 Z"
+        android:fillColor="#FFFFFFFF"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="6"
+        android:strokeLineJoin="round" />
+    <!-- Upscale arrow to the top-right, in the accent cyan. -->
+    <path
+        android:pathData="M63,45 L75,33"
+        android:strokeColor="#FF4DE3FF"
+        android:strokeWidth="5.5"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M66.5,33 L75,33 L75,41.5"
+        android:strokeColor="#FF4DE3FF"
+        android:strokeWidth="5.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>
