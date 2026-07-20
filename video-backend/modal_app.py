@@ -304,6 +304,26 @@ def selftest_video() -> None:
             f"duration={out.duration_seconds:.2f}s"
         )
 
+        # Portrait pass: the same clip with a 90-degree rotation flag (how
+        # phones store portrait video) must probe swapped and come out upright.
+        portrait_src = work / "src_portrait.mp4"
+        subprocess.run(
+            [
+                "ffmpeg", "-y", "-v", "error",
+                "-display_rotation", "90",
+                "-i", str(src), "-c", "copy", str(portrait_src),
+            ],
+            check=True,
+        )
+        p_info = probe_video(portrait_src)
+        assert (p_info.width, p_info.height) == (1080, 1920), (p_info.width, p_info.height)
+        p_target = compute_target_size(p_info.width, p_info.height, OutputSize.X2)
+        p_dst = work / "out_portrait.mp4"
+        enhancer.enhance(portrait_src, p_dst, p_info, p_target, on_frame)
+        p_out = probe_video(p_dst)
+        assert (p_out.width, p_out.height) == p_target, (p_out.width, p_out.height)
+        print(f"portrait OK -> {p_out.width}x{p_out.height} (target {p_target})")
+
 
 # --- Web app -------------------------------------------------------------
 

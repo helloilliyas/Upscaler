@@ -35,6 +35,22 @@ def test_valid_mp4_probes_correctly():
     assert info.has_audio is False
 
 
+def test_rotated_portrait_video_reports_display_dimensions():
+    # Phone portrait video: 64x48 coded + a 90-degree rotation flag must probe
+    # as 48x64, matching the auto-rotated frames ffmpeg decoders emit.
+    info = validate_video_bytes(
+        make_video_bytes(size=(64, 48), rotate=90), **_LIMITS
+    )
+    assert (info.width, info.height) == (48, 64)
+
+
+def test_180_rotation_keeps_dimensions():
+    info = validate_video_bytes(
+        make_video_bytes(size=(64, 48), rotate=180), **_LIMITS
+    )
+    assert (info.width, info.height) == (64, 48)
+
+
 def test_mkv_with_audio_is_accepted():
     info = validate_video_bytes(
         make_video_bytes(duration=1.0, audio=True, container="mkv"), **_LIMITS

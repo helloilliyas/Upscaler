@@ -38,7 +38,14 @@ def _tool(name: str) -> str:
 
 @dataclass(frozen=True)
 class VideoInfo:
-    """Probed facts about a video file (first real video stream)."""
+    """Probed facts about a video file (first real video stream).
+
+    ``width``/``height`` are DISPLAY dimensions: when the stream carries a
+    90/270-degree rotation flag (portrait phone video), they are swapped to
+    match the auto-rotated frames every ffmpeg decoder emits. Treating the
+    coded dimensions as the frame geometry silently shreds portrait video
+    into horizontal stripes.
+    """
 
     width: int
     height: int
@@ -65,6 +72,24 @@ def _parse_float(value: object) -> float | None:
     except ValueError:
         return None
     return parsed if parsed > 0 else None
+
+
+def _rotation_degrees(stream: dict) -> int:
+    """Rotation from the Display Matrix side data (or the legacy rotate tag)."""
+    rotation = 0
+    for side_data in stream.get("side_data_list") or []:
+        if "rotation" in side_data:
+            try:
+                rotation = int(side_data["rotation"])
+            except (TypeError, ValueError):
+                pass
+    legacy = (stream.get("tags") or {}).get("rotate")
+    if legacy is not None:
+        try:
+            rotation = int(legacy)
+        except (TypeError, ValueError):
+            pass
+    return rotation % 360
 
 
 def probe_video(path: str | Path) -> VideoInfo:
@@ -102,6 +127,9 @@ def probe_video(path: str | Path) -> VideoInfo:
     height = int(v.get("height") or 0)
     if width <= 0 or height <= 0:
         raise ProbeError("video stream has no dimensions")
+    # Portrait phone video: decoders auto-rotate, so display dims are swapped.
+    if _rotation_degrees(v) % 180 == 90:
+        width, height = height, width
 
     fps = _parse_rate(v.get("avg_frame_rate")) or _parse_rate(v.get("r_frame_rate"))
     if fps is None:

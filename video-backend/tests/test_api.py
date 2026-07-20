@@ -71,6 +71,21 @@ def test_submit_processes_and_downloads(client):
     assert poster.size == (128, 96)
 
 
+def test_portrait_video_upscales_with_correct_orientation(client):
+    """A rotation-flagged (portrait) clip must produce upright portrait output."""
+    resp = _submit(client, make_video_bytes(size=(64, 48), rotate=90))
+    assert resp.status_code == 201, resp.text
+    job_id = resp.json()["job_id"]
+
+    status = client.get(f"/v1/jobs/{job_id}", headers=auth()).json()
+    assert status["status"] == "completed", status
+    assert (status["width"], status["height"]) == (96, 128)
+
+    result = client.get(f"/v1/jobs/{job_id}/result", headers=auth())
+    info = probe_bytes(result.content)
+    assert (info.width, info.height) == (96, 128)
+
+
 def test_audio_is_preserved(client):
     resp = _submit(client, make_video_bytes(duration=1.0, audio=True))
     assert resp.status_code == 201, resp.text

@@ -82,11 +82,13 @@ def make_video_bytes(
     fps: float = 10.0,
     audio: bool = False,
     container: str = "mp4",
+    rotate: int = 0,
 ) -> bytes:
     """Generate a tiny synthetic clip with ffmpeg and return its bytes.
 
     container: "mp4" (h264), "mkv" (h264 in Matroska), or "avi" (mpeg4, used to
-    test container rejection).
+    test container rejection). rotate: degrees stored as a display-matrix
+    rotation flag (how phones record portrait video).
     """
     w, h = size
     suffix = f".{container}"
@@ -106,6 +108,18 @@ def make_video_bytes(
     with tempfile.TemporaryDirectory() as tmpdir:
         out = Path(tmpdir) / f"clip{suffix}"
         subprocess.run(cmd + [str(out)], check=True, capture_output=True)
+        if rotate:
+            flagged = Path(tmpdir) / f"rotated{suffix}"
+            subprocess.run(
+                [
+                    "ffmpeg", "-y", "-v", "error",
+                    "-display_rotation", str(rotate),
+                    "-i", str(out), "-c", "copy", str(flagged),
+                ],
+                check=True,
+                capture_output=True,
+            )
+            return flagged.read_bytes()
         return out.read_bytes()
 
 
