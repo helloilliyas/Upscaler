@@ -63,7 +63,7 @@ class RealEsrganVideoEnhancer:
 
         if self._model is None:
             self.load()
-        self._upscale_frame(np.zeros((64, 64, 3), dtype=np.uint8))
+        self._upscale_frame(np.zeros((64, 64, 3), dtype=np.uint8), (128, 128))
 
     # --- the streaming pipeline -----------------------------------------
 
@@ -94,7 +94,6 @@ class RealEsrganVideoEnhancer:
         vcodec: str,
     ) -> None:
         w, h = info.width, info.height
-        up_w, up_h = w * _SCALE, h * _SCALE
         tw, th = target
         fps = f"{info.fps:.6f}"
         frame_bytes = w * h * 3
@@ -113,15 +112,17 @@ class RealEsrganVideoEnhancer:
             codec_args = ["-c:v", "hevc_nvenc", "-preset", "p5", "-cq", "23", "-tag:v", "hvc1"]
         else:
             codec_args = ["-c:v", "libx264", "-preset", "fast", "-crf", "18"]
+        # Frames are resized to the final target on the GPU before piping, so
+        # the encoder receives target-sized frames (4x less pipe traffic than
+        # piping the raw 4x model output) and never scales on the CPU.
         encode_cmd = [
             _tool("ffmpeg"), "-hide_banner", "-y", "-v", "error", "-nostats",
             "-f", "rawvideo", "-pix_fmt", "rgb24",
-            "-s", f"{up_w}x{up_h}", "-r", fps,
+            "-s", f"{tw}x{th}", "-r", fps,
             "-i", "pipe:0",
             "-i", str(src),
             "-map", "0:v:0",
             *(["-map", "1:a:0"] if info.has_audio else []),
-            "-vf", f"scale={tw}:{th}:flags=lanczos",
             "-pix_fmt", "yuv420p",
             *codec_args,
             *audio_args(info),
@@ -146,7 +147,7 @@ class RealEsrganVideoEnhancer:
                     if len(raw) < frame_bytes:
                         break
                     frame = np.frombuffer(raw, dtype=np.uint8).reshape(h, w, 3)
-                    encoder.stdin.write(self._upscale_frame(frame).tobytes())
+                    encoder.stdin.write(self._upscale_frame(frame, target).tobytes())
                     frames += 1
                     on_frame(frames)
                 encoder.stdin.close()
@@ -163,13 +164,22 @@ class RealEsrganVideoEnhancer:
             if frames == 0:
                 raise FfmpegError("no frames decoded from source")
 
-    def _upscale_frame(self, frame: Any) -> Any:
-        """rgb24 HxWx3 uint8 -> (4H)x(4W)x3 uint8 through the model."""
+    def _upscale_frame(self, frame: Any, target: tuple[int, int]) -> Any:
+        """rgb24 HxWx3 uint8 -> target-sized (W,H) HxWx3 uint8 through the model.
+
+        The 4x model output is resized to the final target on the GPU (bicubic,
+        antialiased) so only target-sized frames ever cross the CPU boundary.
+        """
         torch = self._torch
+        tw, th = target
         with torch.inference_mode():
-            tensor = torch.from_numpy(frame).cuda().permute(2, 0, 1).unsqueeze(0)
+            tensor = torch.from_numpy(frame.copy()).cuda().permute(2, 0, 1).unsqueeze(0)
             tensor = tensor.half() if self._half else tensor.float()
             out = self._model(tensor.div_(255.0))
+            if (out.shape[3], out.shape[2]) != (tw, th):
+                out = torch.nn.functional.interpolate(
+                    out.float(), size=(th, tw), mode="bicubic", antialias=True
+                )
             out = out.squeeze(0).permute(1, 2, 0).clamp_(0, 1).mul_(255.0).round_()
             return out.to(torch.uint8).cpu().numpy()
 
